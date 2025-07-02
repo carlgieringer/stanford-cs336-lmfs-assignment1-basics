@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug pytest test_train_bpe::test_train_bpe_special_tokens",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/test_train_bpe.py::test_train_bpe_special_tokens",
+        "-s",
+        "-v"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "python": "${workspaceFolder}/.venv/bin/python"
+    }
+  ]
+}
