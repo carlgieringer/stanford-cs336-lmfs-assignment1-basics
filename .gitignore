@@ -168,3 +168,4 @@ cython_debug/
 # scalene
 profile.html
 profile.json
+/profiles/

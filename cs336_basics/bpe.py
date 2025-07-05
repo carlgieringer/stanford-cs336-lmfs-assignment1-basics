@@ -268,14 +268,28 @@ def count_pretoken_bytes(string: str, special_tokens: List[str]):
       pretoken_counts: a Counter keyed by the pretoken bytes.
     """
 
-    # ["fat", " cat"]
-    special_tokens_pattern = "|".join(regex.escape(t) for t in special_tokens)
-    pretoken_pattern = special_tokens_pattern + "|" + BASE_PRETOKEN_PATTERN
+    # Use capturing groups to distinguish special tokens from regular pretokens
+    if special_tokens:
+        special_tokens_pattern = "|".join(regex.escape(t) for t in special_tokens)
+        # Group 1: special tokens, Group 2: regular pretokens
+        pretoken_pattern = f"({special_tokens_pattern})|({BASE_PRETOKEN_PATTERN})"
+    else:
+        # No special tokens, just use the base pattern
+        pretoken_pattern = BASE_PRETOKEN_PATTERN
+
     pretoken_matches = regex.finditer(pretoken_pattern, string)
-    # {(b'f', b'a', b't'): 1, (b' ', b'c', b'a', b't'): 1}
-    pretoken_byte_counts = collections.Counter(
-        tuple(bytes([b]) for b in m.group(0).encode("utf-8"))
-        for m in pretoken_matches
-        if not regex.match(special_tokens_pattern, m.group(0))
-    )
+
+    # Only count matches that are NOT special tokens (group 2 is not None)
+    if special_tokens:
+        pretoken_byte_counts = collections.Counter(
+            tuple(bytes([b]) for b in m.group(0).encode("utf-8"))
+            for m in pretoken_matches
+            if m.group(2) is not None  # Only regular pretokens, not special tokens
+        )
+    else:
+        pretoken_byte_counts = collections.Counter(
+            tuple(bytes([b]) for b in m.group(0).encode("utf-8"))
+            for m in pretoken_matches
+        )
+
     return pretoken_byte_counts
