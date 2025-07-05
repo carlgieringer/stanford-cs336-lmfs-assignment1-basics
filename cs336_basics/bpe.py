@@ -1,3 +1,11 @@
+"""
+Test:
+
+```
+uv run pytest tests/test_train_bpe.py
+```
+"""
+
 import logging
 import os
 import collections
@@ -126,19 +134,18 @@ def determine_merges(
             break
 
         # Find the most common pair. In case of ties, take the lexicographically greatest
-        sorted_pair_counts = prototoken_pair_counts.most_common()
-        most_common_prototoken_pair, most_common_prototoken_pair_count = (
-            sorted_pair_counts[0]
-        )
-        for i in range(1, len(sorted_pair_counts)):
-            next_pretoken_count = sorted_pair_counts[i][1]
-            if next_pretoken_count < most_common_prototoken_pair_count:
-                break
-            next_pretoken_pair = sorted_pair_counts[i][0]
-            if next_pretoken_pair < most_common_prototoken_pair:
-                # Check other pairs for being lexicographically greater
-                continue
-            most_common_prototoken_pair = next_pretoken_pair
+        # Optimize: instead of calling most_common() which sorts everything, find max manually
+        most_common_prototoken_pair = None
+        most_common_prototoken_pair_count = 0
+
+        for pair, count in prototoken_pair_counts.items():
+            if (count > most_common_prototoken_pair_count or
+                (count == most_common_prototoken_pair_count and pair > most_common_prototoken_pair)):
+                most_common_prototoken_pair = pair
+                most_common_prototoken_pair_count = count
+
+        if most_common_prototoken_pair is None:
+            break
 
         merges.append(most_common_prototoken_pair)
         most_common_bytes = b"".join(most_common_prototoken_pair)
