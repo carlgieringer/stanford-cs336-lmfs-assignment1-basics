@@ -1,6 +1,8 @@
 import logging
 import os
 import collections
+from dataclasses import dataclass
+from multiprocessing import Pool
 from typing import BinaryIO, Iterator, List, Tuple, Iterable
 
 import regex
@@ -63,16 +65,12 @@ def train_bpe(
             [t.encode("utf-8") for t in special_tokens],
         )
 
-        # The following is a serial implementation, but you can parallelize this
-        # by sending each start/end pair to a set of processes.
-        for start, end in zip(boundaries[:-1], boundaries[1:]):
-            f.seek(start)
-            chunk = f.read(end - start).decode("utf-8", errors="ignore")
 
-            logger.info(f"Counting pretoken bytes for {(start, end)}")
-            chunk_pretoken_byte_counts = count_pretoken_bytes(chunk, special_tokens)
-            logger.info(f"Done counting pretoken bytes for {(start, end)}")
-            pretoken_byte_counts.update(chunk_pretoken_byte_counts)
+        chunk_args = [ProcessChunkArgs(start, end, input_path, special_tokens)
+                    for start, end in zip(boundaries[:-1], boundaries[1:])]
+        with Pool(kwargs.get("num_processes", 1)) as pool:
+            for chunk_pretoken_byte_counts in pool.imap_unordered(process_chunk, chunk_args):
+                pretoken_byte_counts.update(chunk_pretoken_byte_counts)
 
     logger.info("Done counting all pretoken bytes")
 
@@ -90,6 +88,21 @@ def train_bpe(
     vocab = {i: token for i, token in enumerate(vocab_list)}
     return vocab, merges
 
+@dataclass
+class ProcessChunkArgs:
+  start: int
+  end: int
+  input_path: str | os.PathLike
+  special_tokens: List[str]
+
+def process_chunk(args: ProcessChunkArgs):
+  with open(args.input_path, "rb") as f:
+      f.seek(args.start)
+      chunk = f.read(args.end - args.start).decode("utf-8", errors="ignore")
+  logger.info(f"Counting pretoken bytes for {(args.start, args.end)}")
+  chunk_pretoken_byte_counts = count_pretoken_bytes(chunk, args.special_tokens)
+  logger.info(f"Done counting pretoken bytes for {(args.start, args.end)}")
+  return chunk_pretoken_byte_counts
 
 def determine_merges(
     pretoken_byte_counts: collections.Counter[Tuple[bytes]], merge_token_allowance: int

@@ -45,7 +45,7 @@ def run_train_bpe():
         f"Writing {len(vocab)} vocab and {len(merges)} merges to {args.output_path}"
     )
     with open(args.output_path, "wb") as f:
-        pickle.dump(dict(vocab=vocab, merges=merges), f)
+        pickle.dump(dict(args=args, vocab=vocab, merges=merges), f)
     logging.info("Done training.")
 
 
