@@ -17,6 +17,9 @@ import regex
 
 BYTE_TOKEN_COUNT = 256
 
+# Pre-compute cache for byte-to-bytes conversion to optimize hot path
+BYTE_CACHE = {i: bytes([i]) for i in range(256)}
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -289,13 +292,13 @@ def count_pretoken_bytes(string: str, special_tokens: List[str]):
     # Only count matches that are NOT special tokens (group 2 is not None)
     if special_tokens:
         pretoken_byte_counts = collections.Counter(
-            tuple(bytes([b]) for b in m.group(0).encode("utf-8"))
+            tuple(BYTE_CACHE[b] for b in m.group(0).encode("utf-8"))
             for m in pretoken_matches
             if m.group(2) is not None  # Only regular pretokens, not special tokens
         )
     else:
         pretoken_byte_counts = collections.Counter(
-            tuple(bytes([b]) for b in m.group(0).encode("utf-8"))
+            tuple(BYTE_CACHE[b] for b in m.group(0).encode("utf-8"))
             for m in pretoken_matches
         )
 
