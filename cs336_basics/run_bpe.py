@@ -27,7 +27,9 @@ parser.add_argument(
 )
 parser.add_argument("--output-path", required=True)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 

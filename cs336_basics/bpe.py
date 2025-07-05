@@ -14,14 +14,18 @@ from multiprocessing import Pool
 from typing import BinaryIO, Iterator, List, Tuple, Iterable
 
 import regex
+from tqdm import tqdm
 
 BYTE_TOKEN_COUNT = 256
 
 # Pre-compute cache for byte-to-bytes conversion to optimize hot path
 BYTE_CACHE = {i: bytes([i]) for i in range(256)}
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 class BpeTokenizer:
     def __init__(self, vocab, merges, special_tokens=None):
@@ -51,22 +55,22 @@ def train_bpe(
     output its vocabulary and merges.
 
     Args:
-        input_path (str | os.PathLike): Path to BPE tokenizer training data.
-        vocab_size (int): Total number of items in the tokenizer's vocabulary (including special tokens).
-        special_tokens (list[str]): A list of string special tokens to be added to the tokenizer vocabulary.
-            These strings will never be split into multiple tokens, and will always be
-            kept as a single token. If these special tokens occur in the `input_path`,
-            they are treated as any other string.
+      input_path (str | os.PathLike): Path to BPE tokenizer training data.
+      vocab_size (int): Total number of items in the tokenizer's vocabulary (including special tokens).
+      special_tokens (list[str]): A list of string special tokens to be added to the tokenizer vocabulary.
+        These strings will never be split into multiple tokens, and will always be
+        kept as a single token. If these special tokens occur in the `input_path`,
+        they are treated as any other string.
 
     Returns:
-        tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
-            vocab:
-                The trained tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
-                to bytes (token bytes)
-            merges:
-                BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
-                representing that <token1> was merged with <token2>.
-                Merges are ordered by order of creation.
+      tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+        vocab:
+          The trained tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
+          to bytes (token bytes)
+        merges:
+          BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
+          representing that <token1> was merged with <token2>.
+          Merges are ordered by order of creation.
     """
     pretoken_byte_counts = collections.Counter()
     with open(input_path, "rb") as f:
@@ -76,11 +80,14 @@ def train_bpe(
             [t.encode("utf-8") for t in special_tokens],
         )
 
-
-        chunk_args = [ProcessChunkArgs(start, end, input_path, special_tokens)
-                    for start, end in zip(boundaries[:-1], boundaries[1:])]
+        chunk_args = [
+            ProcessChunkArgs(start, end, input_path, special_tokens)
+            for start, end in zip(boundaries[:-1], boundaries[1:])
+        ]
         with Pool(kwargs.get("num_processes", 1)) as pool:
-            for chunk_pretoken_byte_counts in pool.imap_unordered(process_chunk, chunk_args):
+            for chunk_pretoken_byte_counts in pool.imap_unordered(
+                process_chunk, chunk_args
+            ):
                 pretoken_byte_counts.update(chunk_pretoken_byte_counts)
 
     logger.info("Done counting all pretoken bytes")
@@ -99,25 +106,29 @@ def train_bpe(
     vocab = {i: token for i, token in enumerate(vocab_list)}
     return vocab, merges
 
+
 @dataclass
 class ProcessChunkArgs:
-  start: int
-  end: int
-  input_path: str | os.PathLike
-  special_tokens: List[str]
+    start: int
+    end: int
+    input_path: str | os.PathLike
+    special_tokens: List[str]
+
 
 def process_chunk(args: ProcessChunkArgs):
-  with open(args.input_path, "rb") as f:
-      f.seek(args.start)
-      chunk = f.read(args.end - args.start).decode("utf-8", errors="ignore")
-  logger.info(f"Counting pretoken bytes for {(args.start, args.end)}")
-  chunk_pretoken_byte_counts = count_pretoken_bytes(chunk, args.special_tokens)
-  logger.info(f"Done counting pretoken bytes for {(args.start, args.end)}")
-  return chunk_pretoken_byte_counts
+    with open(args.input_path, "rb") as f:
+        f.seek(args.start)
+        chunk = f.read(args.end - args.start).decode("utf-8", errors="ignore")
+    logger.info(f"Counting pretoken bytes for {(args.start, args.end)}")
+    chunk_pretoken_byte_counts = count_pretoken_bytes(chunk, args.special_tokens)
+    logger.info(f"Done counting pretoken bytes for {(args.start, args.end)}")
+    return chunk_pretoken_byte_counts
+
 
 def determine_merges(
     pretoken_byte_counts: collections.Counter[Tuple[bytes]], merge_token_allowance: int
 ) -> List[Tuple[bytes, bytes]]:
+    logger.info("Initializing merges")
     merges = []
 
     # Initialize pair counts and tracking structures for incremental updates
@@ -131,94 +142,102 @@ def determine_merges(
             prototoken_pair_counts[pair] += count
             pair_to_sequences[pair].add(pretoken_bytes)
 
+    logger.info("Done initializing merges")
     did_merge = True
-    while len(merges) < merge_token_allowance and did_merge:
-        if not prototoken_pair_counts:
-            break
+    with tqdm(
+        total=merge_token_allowance, desc="Calculating merges", unit="merge"
+    ) as pbar:
+        while len(merges) < merge_token_allowance and did_merge:
+            if not prototoken_pair_counts:
+                break
 
-        # Find the most common pair. In case of ties, take the lexicographically greatest
-        # Optimize: instead of calling most_common() which sorts everything, find max manually
-        most_common_prototoken_pair = None
-        most_common_prototoken_pair_count = 0
+            # Find the most common pair. In case of ties, take the lexicographically greatest
+            most_common_prototoken_pair = None
+            most_common_prototoken_pair_count = 0
 
-        for pair, count in prototoken_pair_counts.items():
-            if (count > most_common_prototoken_pair_count or
-                (count == most_common_prototoken_pair_count and pair > most_common_prototoken_pair)):
-                most_common_prototoken_pair = pair
-                most_common_prototoken_pair_count = count
+            for pair, count in prototoken_pair_counts.items():
+                if count > most_common_prototoken_pair_count or (
+                    count == most_common_prototoken_pair_count
+                    and pair > most_common_prototoken_pair
+                ):
+                    most_common_prototoken_pair = pair
+                    most_common_prototoken_pair_count = count
 
-        if most_common_prototoken_pair is None:
-            break
+            if most_common_prototoken_pair is None:
+                break
 
-        merges.append(most_common_prototoken_pair)
-        most_common_bytes = b"".join(most_common_prototoken_pair)
+            merges.append(most_common_prototoken_pair)
+            most_common_bytes = b"".join(most_common_prototoken_pair)
 
-        # Get sequences that contain the pair to merge
-        affected_sequences = pair_to_sequences[most_common_prototoken_pair].copy()
+            # Get sequences that contain the pair to merge
+            affected_sequences = pair_to_sequences[most_common_prototoken_pair].copy()
 
-        # Remove the merged pair from tracking
-        del prototoken_pair_counts[most_common_prototoken_pair]
-        del pair_to_sequences[most_common_prototoken_pair]
+            # Remove the merged pair from tracking
+            del prototoken_pair_counts[most_common_prototoken_pair]
+            del pair_to_sequences[most_common_prototoken_pair]
 
-        did_merge = False
-        new_pretoken_byte_counts = collections.Counter()
-        merged_pretoken_bytes = []
+            did_merge = False
+            new_pretoken_byte_counts = collections.Counter()
+            merged_pretoken_bytes = []
 
-        for pretoken_bytes in affected_sequences:
-            if pretoken_bytes not in pretoken_byte_counts:
-                continue  # Already processed in a previous iteration
+            for pretoken_bytes in affected_sequences:
+                if pretoken_bytes not in pretoken_byte_counts:
+                    continue  # Already processed in a previous iteration
 
-            count = pretoken_byte_counts[pretoken_bytes]
+                count = pretoken_byte_counts[pretoken_bytes]
 
-            # Remove old pairs from this sequence
-            for i in range(len(pretoken_bytes) - 1):
-                old_pair = pretoken_bytes[i : i + 2]
-                prototoken_pair_counts[old_pair] -= count
-                if prototoken_pair_counts[old_pair] <= 0:
-                    del prototoken_pair_counts[old_pair]
-                    if old_pair in pair_to_sequences:
-                        del pair_to_sequences[old_pair]
-                else:
-                    pair_to_sequences[old_pair].discard(pretoken_bytes)
-
-            # Apply merge to create new sequence
-            new_pretoken_bytes = []
-            i = 0
-            while i < len(pretoken_bytes) - 1:
-                if pretoken_bytes[i : i + 2] == most_common_prototoken_pair:
-                    new_pretoken_bytes.append(most_common_bytes)
-                    i += 2
-                else:
-                    new_pretoken_bytes.append(pretoken_bytes[i])
-                    i += 1
-            # Add the last byte if it wasn't picked up as a pair
-            if i < len(pretoken_bytes):
-                new_pretoken_bytes.append(pretoken_bytes[i])
-
-            # Only update if sequence actually changed
-            if len(new_pretoken_bytes) < len(pretoken_bytes):
-                merged_pretoken_bytes.append(pretoken_bytes)
-                new_sequence_key = tuple(new_pretoken_bytes)
-                new_pretoken_byte_counts[new_sequence_key] = count
-
-                # Add new pairs from the merged sequence
-                for i in range(len(new_pretoken_bytes) - 1):
-                    new_pair = tuple(new_pretoken_bytes[i : i + 2])
-                    prototoken_pair_counts[new_pair] += count
-                    pair_to_sequences[new_pair].add(new_sequence_key)
-
-                did_merge = True
-            else:
-                # Sequence didn't change, restore its pairs
+                # Remove old pairs from this sequence
                 for i in range(len(pretoken_bytes) - 1):
-                    pair = pretoken_bytes[i : i + 2]
-                    prototoken_pair_counts[pair] += count
-                    pair_to_sequences[pair].add(pretoken_bytes)
+                    old_pair = pretoken_bytes[i : i + 2]
+                    prototoken_pair_counts[old_pair] -= count
+                    if prototoken_pair_counts[old_pair] <= 0:
+                        del prototoken_pair_counts[old_pair]
+                        if old_pair in pair_to_sequences:
+                            del pair_to_sequences[old_pair]
+                    else:
+                        pair_to_sequences[old_pair].discard(pretoken_bytes)
 
-        # Update the main counter
-        pretoken_byte_counts.update(new_pretoken_byte_counts)
-        for pretoken_bytes in merged_pretoken_bytes:
-            del pretoken_byte_counts[pretoken_bytes]
+                # Apply merge to create new sequence
+                new_pretoken_bytes = []
+                i = 0
+                while i < len(pretoken_bytes) - 1:
+                    if pretoken_bytes[i : i + 2] == most_common_prototoken_pair:
+                        new_pretoken_bytes.append(most_common_bytes)
+                        i += 2
+                    else:
+                        new_pretoken_bytes.append(pretoken_bytes[i])
+                        i += 1
+                # Add the last byte if it wasn't picked up as a pair
+                if i < len(pretoken_bytes):
+                    new_pretoken_bytes.append(pretoken_bytes[i])
+
+                # Only update if sequence actually changed
+                if len(new_pretoken_bytes) < len(pretoken_bytes):
+                    merged_pretoken_bytes.append(pretoken_bytes)
+                    new_sequence_key = tuple(new_pretoken_bytes)
+                    new_pretoken_byte_counts[new_sequence_key] = count
+
+                    # Add new pairs from the merged sequence
+                    for i in range(len(new_pretoken_bytes) - 1):
+                        new_pair = tuple(new_pretoken_bytes[i : i + 2])
+                        prototoken_pair_counts[new_pair] += count
+                        pair_to_sequences[new_pair].add(new_sequence_key)
+
+                    did_merge = True
+                else:
+                    # Sequence didn't change, restore its pairs
+                    for i in range(len(pretoken_bytes) - 1):
+                        pair = pretoken_bytes[i : i + 2]
+                        prototoken_pair_counts[pair] += count
+                        pair_to_sequences[pair].add(pretoken_bytes)
+
+            # Update the main counter
+            pretoken_byte_counts.update(new_pretoken_byte_counts)
+            for pretoken_bytes in merged_pretoken_bytes:
+                del pretoken_byte_counts[pretoken_bytes]
+
+            # Update progress bar
+            pbar.update(1)
 
     return merges
 
