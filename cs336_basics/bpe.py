@@ -1,13 +1,34 @@
+import logging
 import os
 import collections
-from typing import BinaryIO, List, Tuple
+from typing import BinaryIO, Iterator, List, Tuple, Iterable
 
 import regex
 
 BYTE_TOKEN_COUNT = 256
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def bpe(
+class BpeTokenizer:
+    def __init__(self, vocab, merges, special_tokens=None):
+        raise NotImplemented
+
+    @staticmethod
+    def from_files(cls, vocab_filepath, merges_filepath, special_tokens=None):
+        raise NotImplemented
+
+    def encode(self, text: str) -> list[int]:
+        raise NotImplemented
+
+    def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
+        raise NotImplemented
+
+    def decode(self, ids: list[int]) -> str:
+        raise NotImplemented
+
+
+def train_bpe(
     input_path: str | os.PathLike,
     vocab_size: int,
     special_tokens: list[str],
@@ -48,15 +69,21 @@ def bpe(
             f.seek(start)
             chunk = f.read(end - start).decode("utf-8", errors="ignore")
 
+            logger.info(f"Counting pretoken bytes for {(start, end)}")
             chunk_pretoken_byte_counts = count_pretoken_bytes(chunk, special_tokens)
+            logger.info(f"Done counting pretoken bytes for {(start, end)}")
             pretoken_byte_counts.update(chunk_pretoken_byte_counts)
+
+    logger.info("Done counting all pretoken bytes")
 
     vocab_list = [bytes([i]) for i in range(BYTE_TOKEN_COUNT)]
     for special_token in special_tokens:
         vocab_list.append(special_token.encode("utf-8"))
 
     merge_token_allowance = vocab_size - len(vocab_list)
+    logger.info("Determining merges")
     merges = determine_merges(pretoken_byte_counts, merge_token_allowance)
+    logger.info("Done determining merges")
     for token in [b"".join((a, b)) for a, b in merges]:
         vocab_list.append(token)
 
