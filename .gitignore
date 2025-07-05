@@ -164,3 +164,7 @@ cython_debug/
 
 # Downloaded training data
 /data/
+
+# scalene
+profile.html
+profile.json

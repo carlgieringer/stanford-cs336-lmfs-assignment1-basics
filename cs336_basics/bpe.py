@@ -108,15 +108,23 @@ def determine_merges(
     pretoken_byte_counts: collections.Counter[Tuple[bytes]], merge_token_allowance: int
 ) -> List[Tuple[bytes, bytes]]:
     merges = []
+
+    # Initialize pair counts and tracking structures for incremental updates
+    prototoken_pair_counts = collections.Counter()
+    pair_to_sequences = collections.defaultdict(set)  # pair -> set of sequence keys
+
+    # Build initial pair counts and tracking
+    for pretoken_bytes, count in pretoken_byte_counts.items():
+        for i in range(len(pretoken_bytes) - 1):
+            pair = pretoken_bytes[i : i + 2]
+            prototoken_pair_counts[pair] += count
+            pair_to_sequences[pair].add(pretoken_bytes)
+
     did_merge = True
     while len(merges) < merge_token_allowance and did_merge:
-        # Find the most common pair
-        # {(b'a', b't'): 2}
-        prototoken_pair_counts = collections.Counter()
-        for pretoken_bytes, count in pretoken_byte_counts.items():
-            pairs = [pretoken_bytes[i : i + 2] for i in range(len(pretoken_bytes) - 1)]
-            for pair in pairs:
-                prototoken_pair_counts[pair] += count
+        if not prototoken_pair_counts:
+            break
+
         # Find the most common pair. In case of ties, take the lexicographically greatest
         sorted_pair_counts = prototoken_pair_counts.most_common()
         most_common_prototoken_pair, most_common_prototoken_pair_count = (
@@ -131,18 +139,39 @@ def determine_merges(
                 # Check other pairs for being lexicographically greater
                 continue
             most_common_prototoken_pair = next_pretoken_pair
-        del prototoken_pair_counts[most_common_prototoken_pair]
+
         merges.append(most_common_prototoken_pair)
         most_common_bytes = b"".join(most_common_prototoken_pair)
 
-        # merge within pretoken_byte_counts keys.
-        # We need to update prototoken_pair_counts too.
-        # When we find most_common_prototoken_pair in the pretoken_byte_counts, we need
-        # to replace the pairs made from the prototoken before and after it.
+        # Get sequences that contain the pair to merge
+        affected_sequences = pair_to_sequences[most_common_prototoken_pair].copy()
+
+        # Remove the merged pair from tracking
+        del prototoken_pair_counts[most_common_prototoken_pair]
+        del pair_to_sequences[most_common_prototoken_pair]
+
         did_merge = False
         new_pretoken_byte_counts = collections.Counter()
         merged_pretoken_bytes = []
-        for pretoken_bytes, count in pretoken_byte_counts.items():
+
+        for pretoken_bytes in affected_sequences:
+            if pretoken_bytes not in pretoken_byte_counts:
+                continue  # Already processed in a previous iteration
+
+            count = pretoken_byte_counts[pretoken_bytes]
+
+            # Remove old pairs from this sequence
+            for i in range(len(pretoken_bytes) - 1):
+                old_pair = pretoken_bytes[i : i + 2]
+                prototoken_pair_counts[old_pair] -= count
+                if prototoken_pair_counts[old_pair] <= 0:
+                    del prototoken_pair_counts[old_pair]
+                    if old_pair in pair_to_sequences:
+                        del pair_to_sequences[old_pair]
+                else:
+                    pair_to_sequences[old_pair].discard(pretoken_bytes)
+
+            # Apply merge to create new sequence
             new_pretoken_bytes = []
             i = 0
             while i < len(pretoken_bytes) - 1:
@@ -155,16 +184,32 @@ def determine_merges(
             # Add the last byte if it wasn't picked up as a pair
             if i < len(pretoken_bytes):
                 new_pretoken_bytes.append(pretoken_bytes[i])
-            # Store the count of the merged pretoken
+
+            # Only update if sequence actually changed
             if len(new_pretoken_bytes) < len(pretoken_bytes):
                 merged_pretoken_bytes.append(pretoken_bytes)
-                new_pretoken_byte_counts[tuple(new_pretoken_bytes)] = (
-                    pretoken_byte_counts[pretoken_bytes]
-                )
+                new_sequence_key = tuple(new_pretoken_bytes)
+                new_pretoken_byte_counts[new_sequence_key] = count
+
+                # Add new pairs from the merged sequence
+                for i in range(len(new_pretoken_bytes) - 1):
+                    new_pair = tuple(new_pretoken_bytes[i : i + 2])
+                    prototoken_pair_counts[new_pair] += count
+                    pair_to_sequences[new_pair].add(new_sequence_key)
+
                 did_merge = True
+            else:
+                # Sequence didn't change, restore its pairs
+                for i in range(len(pretoken_bytes) - 1):
+                    pair = pretoken_bytes[i : i + 2]
+                    prototoken_pair_counts[pair] += count
+                    pair_to_sequences[pair].add(pretoken_bytes)
+
+        # Update the main counter
         pretoken_byte_counts.update(new_pretoken_byte_counts)
         for pretoken_bytes in merged_pretoken_bytes:
             del pretoken_byte_counts[pretoken_bytes]
+
     return merges
 
 
