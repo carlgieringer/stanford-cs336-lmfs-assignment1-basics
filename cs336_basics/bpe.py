@@ -11,7 +11,7 @@ import os
 import collections
 from dataclasses import dataclass
 from multiprocessing import Pool
-from typing import BinaryIO, Iterator, List, Tuple, Iterable
+from typing import BinaryIO
 
 import regex
 from tqdm import tqdm
@@ -25,24 +25,6 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-
-class BpeTokenizer:
-    def __init__(self, vocab, merges, special_tokens=None):
-        raise NotImplemented
-
-    @staticmethod
-    def from_files(cls, vocab_filepath, merges_filepath, special_tokens=None):
-        raise NotImplemented
-
-    def encode(self, text: str) -> list[int]:
-        raise NotImplemented
-
-    def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
-        raise NotImplemented
-
-    def decode(self, ids: list[int]) -> str:
-        raise NotImplemented
 
 
 def train_bpe(
@@ -112,7 +94,7 @@ class ProcessChunkArgs:
     start: int
     end: int
     input_path: str | os.PathLike
-    special_tokens: List[str]
+    special_tokens: list[str]
 
 
 def process_chunk(args: ProcessChunkArgs):
@@ -126,8 +108,8 @@ def process_chunk(args: ProcessChunkArgs):
 
 
 def determine_merges(
-    pretoken_byte_counts: collections.Counter[Tuple[bytes]], merge_token_allowance: int
-) -> List[Tuple[bytes, bytes]]:
+    pretoken_byte_counts: collections.Counter[tuple[bytes]], merge_token_allowance: int
+) -> list[tuple[bytes, bytes]]:
     logger.info("Initializing merges")
     merges = []
 
@@ -286,39 +268,35 @@ def find_chunk_boundaries(
     return sorted(set(chunk_boundaries))
 
 
-BASE_PRETOKEN_PATTERN = (
+PRETOKEN_PATTERN = (
     r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 )
 
 
-def count_pretoken_bytes(string: str, special_tokens: List[str]):
+def make_special_tokens_pattern(special_tokens: list[str]) -> str:
+    assert special_tokens
+    # Sort the special tokens to prevent backtracking which can cause BASE_PRETOKEN_PATTERN to
+    # match special tokens.
+    special_tokens = sorted(special_tokens, key=len, reverse=True)
+    return "|".join(regex.escape(t) for t in special_tokens)
+
+
+def count_pretoken_bytes(text: str, special_tokens: list[str]):
     """
     Returns:
       pretoken_counts: a Counter keyed by the pretoken bytes.
     """
 
-    # Use capturing groups to distinguish special tokens from regular pretokens
-    if special_tokens:
-        special_tokens_pattern = "|".join(regex.escape(t) for t in special_tokens)
-        # Group 1: special tokens, Group 2: regular pretokens
-        pretoken_pattern = f"({special_tokens_pattern})|({BASE_PRETOKEN_PATTERN})"
-    else:
-        # No special tokens, just use the base pattern
-        pretoken_pattern = BASE_PRETOKEN_PATTERN
-
-    pretoken_matches = regex.finditer(pretoken_pattern, string)
-
     # Only count matches that are NOT special tokens (group 2 is not None)
     if special_tokens:
-        pretoken_byte_counts = collections.Counter(
-            tuple(BYTE_CACHE[b] for b in m.group(0).encode("utf-8"))
-            for m in pretoken_matches
-            if m.group(2) is not None  # Only regular pretokens, not special tokens
-        )
+        special_tokens_pattern = make_special_tokens_pattern(special_tokens)
+        splits = regex.split(special_tokens_pattern, text)
     else:
-        pretoken_byte_counts = collections.Counter(
-            tuple(BYTE_CACHE[b] for b in m.group(0).encode("utf-8"))
-            for m in pretoken_matches
-        )
+        splits = [text]
 
+    pretoken_byte_counts = collections.Counter(
+        tuple(BYTE_CACHE[b] for b in pretoken.encode("utf-8"))
+        for split in splits
+        for pretoken in regex.findall(PRETOKEN_PATTERN, split)
+    )
     return pretoken_byte_counts
