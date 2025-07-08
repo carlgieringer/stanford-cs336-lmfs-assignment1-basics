@@ -260,7 +260,7 @@ def find_chunk_boundaries(
             # Find the special token in the mini chunk
             match = regex.search(special_tokens_pattern, mini_chunk)
             if match:
-                chunk_boundaries[bi] = initial_position + match.start()
+                chunk_boundaries[bi] = initial_position + match.end()
                 break
             initial_position += mini_chunk_size
 

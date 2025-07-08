@@ -7,17 +7,25 @@ uv run pytest tests/test_tokenizer.py
 """
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from itertools import zip_longest
 import logging
 import pickle
 from typing import Generator, Iterable, Optional
 
 import regex
+from tqdm import tqdm
 
 from cs336_basics import bpe
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TqdmParams:
+    position: int
+    tqdm_position_desc: str
 
 
 class BpeTokenizer:
@@ -53,10 +61,12 @@ class BpeTokenizer:
             data = pickle.load(f)
         return BpeTokenizer(data["vocab"], data["merges"], special_tokens)
 
-    def encode(self, text: str) -> list[int]:
-        return list(self._generate_tokens(text))
+    def encode(self, text: str, tqdm_params: Optional[TqdmParams] = None) -> list[int]:
+        return list(self._generate_tokens(text, tqdm_params))
 
-    def _generate_tokens(self, text: str) -> Generator[int]:
+    def _generate_tokens(
+        self, text: str, tqdm_params: Optional[TqdmParams] = None
+    ) -> Generator[int]:
         if self.special_tokens:
             special_tokens_pattern = bpe.make_special_tokens_pattern(
                 self.special_tokens or []
@@ -81,7 +91,19 @@ class BpeTokenizer:
             special_token_matches = []
             splits = [text]
         splits_pretoken_bytes_lists: list[list[list[bytes]]] = []
-        for split in splits:
+
+        splits_iter = (
+            tqdm(splits, desc="Splits", unit="split")
+            if tqdm_params is None
+            else tqdm(
+                splits,
+                desc=f"Splits ({tqdm_params.tqdm_position_desc})",
+                unit="split",
+                position=tqdm_params.position,
+                leave=False,
+            )
+        )
+        for split in splits_iter:
             split_pretoken_bytes_lists: list[list[bytes]] = []
             splits_pretoken_bytes_lists.append(split_pretoken_bytes_lists)
             pretokens = regex.findall(bpe.PRETOKEN_PATTERN, split)

@@ -19,6 +19,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "wandb>=0.19.7",
     "scalene>=1.5.51",
+    "humanfriendly>=10.0",
 ]
 
 

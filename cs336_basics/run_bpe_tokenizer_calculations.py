@@ -2,7 +2,7 @@
 Run:
 
 ```sh
-uv run python cs336_basics/run_bpe_tokenizer.py\
+uv run python cs336_basics/run_bpe_tokenizer_calculations.py\
  --tokenizer-pickle-file=data/bpe-TinyStoriesV2-GPT4-train.pk\
  --sample-file=data/TinyStoriesV2-GPT4-valid.txt
 ```
