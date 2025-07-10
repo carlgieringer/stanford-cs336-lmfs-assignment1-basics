@@ -119,7 +119,6 @@ class BpeTokenizer:
                             and pretoken_bytes_list[i + 1] == merge[1]
                         ):
                             pretoken_bytes_list[i : i + 2] = [b"".join(merge)]
-                            logger.debug("Merged {merge}: {pretoken_bytes}")
                         i += 1
                 split_pretoken_bytes_lists.append(pretoken_bytes_list)
         for split_token_bytes_list, special_token_match in zip_longest(
