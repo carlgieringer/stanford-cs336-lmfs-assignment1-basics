@@ -181,7 +181,7 @@ def combine_chunk_files(
     keep_chunks: bool,
 ):
     """
-    Combine multiple NumPy chunk files into a single file using memory mapping.
+    Combine multiple NumPy chunk files into a single file by loading arrays into memory.
 
     Args:
         chunk_tokenization_paths: Paths of tokenization files to combine
@@ -198,44 +198,32 @@ def combine_chunk_files(
 
     logger.info(f"Combining chunks: {chunk_tokenization_paths}")
 
-    # Calculate total size by reading headers
-    total_length = 0
+    # Load all chunk arrays into memory
+    chunk_arrays = []
     dtype = None
+    total_length = 0
 
     for file_path in chunk_tokenization_paths:
-        # Load just the header to get shape and dtype
-        # Read NumPy header to get shape and dtype without loading data
-        arr = np.load(file_path, mmap_mode="r")
+        chunk_array = np.load(file_path)
         if dtype is None:
-            dtype = arr.dtype
-        elif arr.dtype != dtype:
-            raise ValueError(f"Inconsistent dtypes: {dtype} vs {arr.dtype}")
-        total_length += arr.shape[0]
+            dtype = chunk_array.dtype
+        elif chunk_array.dtype != dtype:
+            raise ValueError(f"Inconsistent dtypes: {dtype} vs {chunk_array.dtype}")
+
+        chunk_arrays.append(chunk_array)
+        total_length += chunk_array.shape[0]
+
+        logger.info(
+            f"Loaded chunk from {file_path} ({chunk_array.shape[0]} tokens)"
+        )
 
     logger.info(f"Total combined array length: {total_length}, dtype: {dtype}")
 
-    # Create memory-mapped array for the final result
-    combined_array = np.memmap(
-        output_path, dtype=dtype, mode="w+", shape=(total_length,)
-    )
+    # Combine all arrays in memory using concatenate
+    combined_array = np.concatenate(chunk_arrays, axis=0)
 
-    # Copy data from each chunk
-    current_offset = 0
-    for file_path in chunk_tokenization_paths:
-        chunk_array = np.load(file_path)
-        chunk_length = chunk_array.shape[0]
-
-        # Copy chunk data to the appropriate offset in combined array
-        combined_array[current_offset : current_offset + chunk_length] = chunk_array
-        current_offset += chunk_length
-
-        logger.info(
-            f"Copied chunk from {file_path} ({chunk_length} tokens) to offset {current_offset - chunk_length}"
-        )
-
-    # Flush to ensure data is written to disk
-    combined_array.flush()
-    del combined_array  # Close the memory-mapped file
+    # Write the combined array to disk
+    np.save(output_path, combined_array)
 
     logger.info(
         f"Successfully combined {len(chunk_tokenization_paths)} chunks into {output_path}"
