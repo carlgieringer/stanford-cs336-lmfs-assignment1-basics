@@ -6,11 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
-      "args": [
-        "tests/test_tokenizer.py::test_roundtrip_unicode_string_with_special_tokens",
-        "-s",
-        "-v"
-      ],
+      "args": ["tests/test_model.py::test_rmsnorm", "-s", "-v"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {},
