@@ -1,3 +1,5 @@
+import math
+
 import torch
 
 
@@ -14,8 +16,9 @@ class Linear(torch.nn.Module):
         self.weights = torch.nn.Parameter(
             torch.empty(out_features, in_features, device=device, dtype=dtype)
         )
-        sigma = 2 / (in_features + out_features)
-        torch.nn.init.trunc_normal_(self.weights, 0, sigma, -3 * sigma, 3 * sigma)
+        std = 2 / (in_features + out_features)
+        sigma = math.sqrt(std)
+        torch.nn.init.trunc_normal_(self.weights, 0, std, -3 * sigma, 3 * sigma)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply the linear transformation to the input."""
