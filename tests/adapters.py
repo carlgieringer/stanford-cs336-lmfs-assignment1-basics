@@ -16,6 +16,7 @@ from cs336_basics import (
     embedding as embedding_lib,
     rmsnorm as rmsnorm_lib,
     swiglu as swiglu_lib,
+    rope as rope_lib,
 )
 
 
@@ -214,7 +215,8 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rope = rope_lib.RotaryPositionalEmbedding(theta, d_k, max_seq_len)
+    return rope.forward(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
