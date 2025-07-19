@@ -15,7 +15,7 @@ import torch
 from torch import Tensor
 from jaxtyping import Float, Bool, Int
 
-from cs336_basics import rope as rope_lib
+from cs336_basics import linear, rope as rope_lib
 from cs336_basics.softmax import softmax
 
 
@@ -48,25 +48,10 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
         self.n_heads = n_heads
         self.d_k = self.d_v = d_model // n_heads
 
-        self.weights_q = torch.nn.Parameter(
-            torch.empty(d_model, d_model, device=device, dtype=dtype)
-        )
-        self.weights_k = torch.nn.Parameter(
-            torch.empty(d_model, d_model, device=device, dtype=dtype)
-        )
-        self.weights_v = torch.nn.Parameter(
-            torch.empty(d_model, d_model, device=device, dtype=dtype)
-        )
-        self.weights_o = torch.nn.Parameter(
-            torch.empty(d_model, d_model, device=device, dtype=dtype)
-        )
-
-        std = 1 / d_model  # = 2 / (d_model + d_model)
-        sigma = math.sqrt(std)
-        torch.nn.init.trunc_normal_(self.weights_q, 0, std, -3 * sigma, 3 * sigma)
-        torch.nn.init.trunc_normal_(self.weights_k, 0, std, -3 * sigma, 3 * sigma)
-        torch.nn.init.trunc_normal_(self.weights_v, 0, std, -3 * sigma, 3 * sigma)
-        torch.nn.init.trunc_normal_(self.weights_o, 0, std, -3 * sigma, 3 * sigma)
+        self.q_proj = linear.Linear(d_model, d_model, device=device, dtype=dtype)
+        self.k_proj = linear.Linear(d_model, d_model, device=device, dtype=dtype)
+        self.v_proj = linear.Linear(d_model, d_model, device=device, dtype=dtype)
+        self.output_proj = linear.Linear(d_model, d_model, device=device, dtype=dtype)
 
         if theta > 0 and max_seq_len > 0:
             self.rope = rope_lib.RotaryPositionalEmbedding(theta, self.d_k, max_seq_len)
@@ -82,9 +67,9 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
         x: Float[Tensor, " ... sequence_length d_in"],
         token_positions: Optional[Int[Tensor, " ... sequence_length"]] = None,
     ) -> Float[Tensor, "... d_model"]:
-        q = x @ self.weights_q.T
-        k = x @ self.weights_k.T
-        v = x @ self.weights_v.T
+        q = self.q_proj(x)
+        k = self.k_proj(x)
+        v = self.v_proj(x)
 
         q_heads = q.unflatten(-1, (self.n_heads, self.d_k)).transpose(-3, -2)
         k_heads = k.unflatten(-1, (self.n_heads, self.d_k)).transpose(-3, -2)
@@ -105,5 +90,5 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
 
         attention = attention_heads.transpose(-2, -3).flatten(-2, -1)
 
-        o = attention @ self.weights_o.T
+        o = self.output_proj(attention)
         return o

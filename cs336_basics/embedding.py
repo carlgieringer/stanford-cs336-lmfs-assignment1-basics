@@ -1,5 +1,7 @@
 import torch
 
+from cs336_basics import linear
+
 
 class Embedding(torch.nn.Module):
     def __init__(self, num_embeddings, embedding_dim, device=None, dtype=None):
@@ -12,15 +14,13 @@ class Embedding(torch.nn.Module):
             dtype: torch.dtype | None = None Data type of the parameters
         """
         super().__init__()
-        self.weights = torch.nn.Parameter(
+        self.weight = torch.nn.Parameter(
             torch.empty(num_embeddings, embedding_dim, device=device, dtype=dtype)
         )
-        sigma = 2 / (num_embeddings + embedding_dim)
-        torch.nn.init.trunc_normal_(self.weights, 0, sigma, -3, 3)
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         """Lookup the embedding vectors for the given token IDs."""
         one_hot = torch.nn.functional.one_hot(
-            token_ids, num_classes=self.weights.shape[0]
+            token_ids, num_classes=self.weight.shape[0]
         ).float()
-        return torch.einsum("...v,ve", one_hot, self.weights)
+        return torch.einsum("...v,ve", one_hot, self.weight)

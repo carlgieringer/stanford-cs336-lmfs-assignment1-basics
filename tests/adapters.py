@@ -42,7 +42,7 @@ def run_linear(
     """
 
     lin = linear_lib.Linear(d_in, d_out)
-    lin.load_state_dict({"weights": weights})
+    lin.load_state_dict({"weight": weights})
     return lin.forward(in_features)
 
 
@@ -66,7 +66,7 @@ def run_embedding(
     """
 
     embedding = embedding_lib.Embedding(vocab_size, d_model)
-    embedding.load_state_dict({"weights": weights})
+    embedding.load_state_dict({"weight": weights})
     return embedding.forward(token_ids)
 
 
@@ -95,9 +95,9 @@ def run_swiglu(
     swiglu = swiglu_lib.Swiglu(d_model, d_ff)
     swiglu.load_state_dict(
         {
-            "w1": w1_weight,
-            "w2": w2_weight,
-            "w3": w3_weight,
+            "w1.weight": w1_weight,
+            "w2.weight": w2_weight,
+            "w3.weight": w3_weight,
         }
     )
     return swiglu.forward(in_features)
@@ -161,10 +161,10 @@ def run_multihead_self_attention(
     d_k = d_v = d_model // num_heads
     attention.load_state_dict(
         {
-            "weights_q": q_proj_weight,
-            "weights_k": k_proj_weight,
-            "weights_v": v_proj_weight,
-            "weights_o": o_proj_weight,
+            "q_proj.weight": q_proj_weight,
+            "k_proj.weight": k_proj_weight,
+            "v_proj.weight": v_proj_weight,
+            "output_proj.weight": o_proj_weight,
         }
     )
     return attention.forward(in_features)
@@ -212,10 +212,10 @@ def run_multihead_self_attention_with_rope(
     )
     attention.load_state_dict(
         {
-            "weights_q": q_proj_weight,
-            "weights_k": k_proj_weight,
-            "weights_v": v_proj_weight,
-            "weights_o": o_proj_weight,
+            "q_proj.weight": q_proj_weight,
+            "k_proj.weight": k_proj_weight,
+            "v_proj.weight": v_proj_weight,
+            "output_proj.weight": o_proj_weight,
         }
     )
     return attention.forward(in_features, token_positions)
@@ -317,8 +317,7 @@ def run_transformer_block(
     transformer_block = transformer_lib.TransformerBlock(
         d_model, num_heads, d_ff, max_seq_len, theta
     )
-    fixed_weights = fix_weight_keys(weights)
-    load_result = transformer_block.load_state_dict(fixed_weights)
+    load_result = transformer_block.load_state_dict(weights)
     if load_result.missing_keys or load_result.unexpected_keys:
         raise Exception(
             f"load_state_dict mismatch. missing_keys: {load_result.missing_keys}; unexpected_keys: {load_result.unexpected_keys}"
@@ -350,7 +349,7 @@ def run_transformer_lm(
         num_heads (int): Number of heads to use in multi-headed attention. `d_model` must be
             evenly divisible by `num_heads`.
         d_ff (int): Dimensionality of the feed-forward inner layer (section 3.3).
-        rope_theta (float): The RoPE $\Theta$ parameter.
+        rope_theta (float): The RoPE $\\Theta$ parameter.
         weights (dict[str, Tensor]):
             State dict of our reference implementation. {num_layers} refers to an
             integer between `0` and `num_layers - 1` (the layer index).
@@ -408,64 +407,9 @@ def run_transformer_lm(
     lm = transformer_lib.TransformerLm(
         d_model, num_heads, d_ff, rope_theta, vocab_size, context_length, num_layers
     )
-    weights = {fix_weight_key(key): val for key, val in weights.items()}
     lm.load_state_dict(weights)
     return lm(in_indices)
 
-# Weight key mapping from reference format to module format
-WEIGHT_KEY_MAPPING = {
-    # Attention weights (with and without leading dot)
-    '.attn.q_proj.weight': '.attn.weights_q',
-    '.attn.k_proj.weight': '.attn.weights_k',
-    '.attn.v_proj.weight': '.attn.weights_v',
-    '.attn.output_proj.weight': '.attn.weights_o',
-    'attn.q_proj.weight': 'attn.weights_q',
-    'attn.k_proj.weight': 'attn.weights_k',
-    'attn.v_proj.weight': 'attn.weights_v',
-    'attn.output_proj.weight': 'attn.weights_o',
-
-    # RMSNorm weights (with and without leading dot)
-    '.ln1.weight': '.ln1.weights',
-    '.ln2.weight': '.ln2.weights',
-    'ln1.weight': 'ln1.weights',
-    'ln2.weight': 'ln2.weights',
-    'ln_final.weight': 'ln_final.weights',
-
-    # FFN weights (these don't need .weight suffix)
-    '.ffn.w1.weight': '.ffn.w1',
-    '.ffn.w2.weight': '.ffn.w2',
-    '.ffn.w3.weight': '.ffn.w3',
-    'ffn.w1.weight': 'ffn.w1',
-    'ffn.w2.weight': 'ffn.w2',
-    'ffn.w3.weight': 'ffn.w3',
-
-    # Embedding weights
-    'token_embeddings.weight': 'token_embeddings.weights',
-    'lm_head.weight': 'lm_head.weights',
-}
-
-
-def fix_weight_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    """Transform reference weight keys to match our module parameter names."""
-    fixed_dict = {}
-
-    for key, tensor in state_dict.items():
-        new_key = key
-        for ref_suffix, module_suffix in WEIGHT_KEY_MAPPING.items():
-            if key.endswith(ref_suffix) or key == ref_suffix:
-                new_key = key.replace(ref_suffix, module_suffix)
-                break
-        fixed_dict[new_key] = tensor
-
-    return fixed_dict
-
-
-def fix_weight_key(key: str) -> str:
-    """Transform a single reference weight key to match our module parameter names."""
-    for ref_suffix, module_suffix in WEIGHT_KEY_MAPPING.items():
-        if key.endswith(ref_suffix) or key == ref_suffix:
-            return key.replace(ref_suffix, module_suffix)
-    return key
 
 def run_rmsnorm(
     d_model: int,
@@ -488,7 +432,7 @@ def run_rmsnorm(
         RMSNorm of the `in_features`.
     """
     rms_norm = rmsnorm_lib.RmsNorm(d_model, eps)
-    rms_norm.load_state_dict({"weights": weights})
+    rms_norm.load_state_dict({"weight": weights})
     return rms_norm.forward(in_features)
 
 
