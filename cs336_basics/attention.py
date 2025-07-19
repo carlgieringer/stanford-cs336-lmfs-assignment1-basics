@@ -1,8 +1,6 @@
 """
 Tests:
 
-    uv run pytest -k test_softmax_matches_pytorch
-
     uv run pytest -k test_scaled_dot_product_attention
     uv run pytest -k test_4d_scaled_dot_product_attention
 
@@ -18,12 +16,7 @@ from torch import Tensor
 from jaxtyping import Float, Bool, Int
 
 from cs336_basics import rope as rope_lib
-
-
-def softmax(tensor: torch.Tensor, *, dim: int):
-    shifted = tensor - tensor.max(dim=dim, keepdim=True)[0]
-    exped = shifted.exp()
-    return exped / exped.sum(dim=dim, keepdim=True)
+from cs336_basics.softmax import softmax
 
 
 def scaled_dot_product_attention(

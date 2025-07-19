@@ -317,19 +317,8 @@ def run_transformer_block(
     transformer_block = transformer_lib.TransformerBlock(
         d_model, num_heads, d_ff, max_seq_len, theta
     )
-    load_result = transformer_block.load_state_dict(
-        {
-            "attn.weights_q": weights["attn.q_proj.weight"],
-            "attn.weights_k": weights["attn.k_proj.weight"],
-            "attn.weights_v": weights["attn.v_proj.weight"],
-            "attn.weights_o": weights["attn.output_proj.weight"],
-            "ln1.weights": weights["ln1.weight"],
-            "ffn.w1": weights["ffn.w1.weight"],
-            "ffn.w2": weights["ffn.w2.weight"],
-            "ffn.w3": weights["ffn.w3.weight"],
-            "ln2.weights": weights["ln2.weight"],
-        }
-    )
+    fixed_weights = fix_weight_keys(weights)
+    load_result = transformer_block.load_state_dict(fixed_weights)
     if load_result.missing_keys or load_result.unexpected_keys:
         raise Exception(
             f"load_state_dict mismatch. missing_keys: {load_result.missing_keys}; unexpected_keys: {load_result.unexpected_keys}"
@@ -416,8 +405,67 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    lm = transformer_lib.TransformerLm(
+        d_model, num_heads, d_ff, rope_theta, vocab_size, context_length, num_layers
+    )
+    weights = {fix_weight_key(key): val for key, val in weights.items()}
+    lm.load_state_dict(weights)
+    return lm(in_indices)
 
+# Weight key mapping from reference format to module format
+WEIGHT_KEY_MAPPING = {
+    # Attention weights (with and without leading dot)
+    '.attn.q_proj.weight': '.attn.weights_q',
+    '.attn.k_proj.weight': '.attn.weights_k',
+    '.attn.v_proj.weight': '.attn.weights_v',
+    '.attn.output_proj.weight': '.attn.weights_o',
+    'attn.q_proj.weight': 'attn.weights_q',
+    'attn.k_proj.weight': 'attn.weights_k',
+    'attn.v_proj.weight': 'attn.weights_v',
+    'attn.output_proj.weight': 'attn.weights_o',
+
+    # RMSNorm weights (with and without leading dot)
+    '.ln1.weight': '.ln1.weights',
+    '.ln2.weight': '.ln2.weights',
+    'ln1.weight': 'ln1.weights',
+    'ln2.weight': 'ln2.weights',
+    'ln_final.weight': 'ln_final.weights',
+
+    # FFN weights (these don't need .weight suffix)
+    '.ffn.w1.weight': '.ffn.w1',
+    '.ffn.w2.weight': '.ffn.w2',
+    '.ffn.w3.weight': '.ffn.w3',
+    'ffn.w1.weight': 'ffn.w1',
+    'ffn.w2.weight': 'ffn.w2',
+    'ffn.w3.weight': 'ffn.w3',
+
+    # Embedding weights
+    'token_embeddings.weight': 'token_embeddings.weights',
+    'lm_head.weight': 'lm_head.weights',
+}
+
+
+def fix_weight_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    """Transform reference weight keys to match our module parameter names."""
+    fixed_dict = {}
+
+    for key, tensor in state_dict.items():
+        new_key = key
+        for ref_suffix, module_suffix in WEIGHT_KEY_MAPPING.items():
+            if key.endswith(ref_suffix) or key == ref_suffix:
+                new_key = key.replace(ref_suffix, module_suffix)
+                break
+        fixed_dict[new_key] = tensor
+
+    return fixed_dict
+
+
+def fix_weight_key(key: str) -> str:
+    """Transform a single reference weight key to match our module parameter names."""
+    for ref_suffix, module_suffix in WEIGHT_KEY_MAPPING.items():
+        if key.endswith(ref_suffix) or key == ref_suffix:
+            return key.replace(ref_suffix, module_suffix)
+    return key
 
 def run_rmsnorm(
     d_model: int,
