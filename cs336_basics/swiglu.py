@@ -9,9 +9,6 @@ class Swiglu(torch.nn.Module):
     def __init__(self, d_model: int, d_ff: int, device=None, dtype=None):
         super().__init__()
 
-        std = 2 / (d_model + d_ff)
-        sigma = math.sqrt(std)
-
         self.w1 = torch.nn.Parameter(
             torch.empty(d_ff, d_model, device=device, dtype=dtype)
         )
@@ -21,6 +18,9 @@ class Swiglu(torch.nn.Module):
         self.w3 = torch.nn.Parameter(
             torch.empty(d_ff, d_model, device=device, dtype=dtype)
         )
+
+        std = 2 / (d_model + d_ff)
+        sigma = math.sqrt(std)
         torch.nn.init.trunc_normal_(self.w1, 0, std, -3 * sigma, 3 * sigma)
         torch.nn.init.trunc_normal_(self.w2, 0, std, -3 * sigma, 3 * sigma)
         torch.nn.init.trunc_normal_(self.w3, 0, std, -3 * sigma, 3 * sigma)

@@ -100,8 +100,8 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
         if token_positions is not None:
             if not self.rope:
                 raise Exception("rope must have been initialized for token_positions")
-            q_heads = self.rope.forward(q_heads, token_positions)
-            k_heads = self.rope.forward(k_heads, token_positions)
+            q_heads = self.rope(q_heads, token_positions)
+            k_heads = self.rope(k_heads, token_positions)
 
         seq_len = x.shape[-2]
         mask = torch.tril(

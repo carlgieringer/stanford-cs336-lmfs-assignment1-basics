@@ -18,6 +18,7 @@ from cs336_basics import (
     swiglu as swiglu_lib,
     rope as rope_lib,
     attention as attention_lib,
+    transformer as transformer_lib,
 )
 
 
@@ -209,7 +210,6 @@ def run_multihead_self_attention_with_rope(
     attention = attention_lib.CausalMultiheadSelfAttention(
         d_model, num_heads, max_seq_len, theta
     )
-    d_k = d_v = d_model // num_heads
     attention.load_state_dict(
         {
             "weights_q": q_proj_weight,
@@ -314,7 +314,27 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    transformer_block = transformer_lib.TransformerBlock(
+        d_model, num_heads, d_ff, max_seq_len, theta
+    )
+    load_result = transformer_block.load_state_dict(
+        {
+            "attn.weights_q": weights["attn.q_proj.weight"],
+            "attn.weights_k": weights["attn.k_proj.weight"],
+            "attn.weights_v": weights["attn.v_proj.weight"],
+            "attn.weights_o": weights["attn.output_proj.weight"],
+            "ln1.weights": weights["ln1.weight"],
+            "ffn.w1": weights["ffn.w1.weight"],
+            "ffn.w2": weights["ffn.w2.weight"],
+            "ffn.w3": weights["ffn.w3.weight"],
+            "ln2.weights": weights["ln2.weight"],
+        }
+    )
+    if load_result.missing_keys or load_result.unexpected_keys:
+        raise Exception(
+            f"load_state_dict mismatch. missing_keys: {load_result.missing_keys}; unexpected_keys: {load_result.unexpected_keys}"
+        )
+    return transformer_block(in_features)
 
 
 def run_transformer_lm(
