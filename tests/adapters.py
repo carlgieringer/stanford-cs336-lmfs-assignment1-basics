@@ -12,6 +12,7 @@ from torch import Tensor
 from cs336_basics import (
     bpe,
     bpe_tokenizer,
+    cross_entropy,
     linear as linear_lib,
     embedding as embedding_lib,
     rmsnorm as rmsnorm_lib,
@@ -504,7 +505,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return cross_entropy.cross_entropy(inputs, targets)
 
 
 def run_gradient_clipping(
