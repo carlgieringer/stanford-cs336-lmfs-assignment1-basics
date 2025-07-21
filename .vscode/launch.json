@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
-      "args": ["-k", "test_cross_entropy", "-s", "-v"],
+      "args": ["-k", "test_adamw", "-s", "-v"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {},
