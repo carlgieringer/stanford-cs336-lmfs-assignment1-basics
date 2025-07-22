@@ -14,6 +14,7 @@ from cs336_basics import (
     bpe,
     bpe_tokenizer,
     cross_entropy,
+    learning_rate_schedule,
     linear as linear_lib,
     embedding as embedding_lib,
     rmsnorm as rmsnorm_lib,
@@ -555,7 +556,9 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    return learning_rate_schedule.cosine_annealing_lr_schedule(
+        it, min_learning_rate, max_learning_rate, warmup_iters, cosine_cycle_iters
+    )
 
 
 def run_save_checkpoint(
