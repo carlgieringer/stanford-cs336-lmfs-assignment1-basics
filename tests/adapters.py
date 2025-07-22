@@ -14,6 +14,7 @@ from cs336_basics import (
     bpe,
     bpe_tokenizer,
     cross_entropy,
+    gradient_clipping,
     learning_rate_schedule,
     linear as linear_lib,
     embedding as embedding_lib,
@@ -521,7 +522,7 @@ def run_gradient_clipping(
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    return gradient_clipping.clip_gradients(parameters, max_l2_norm)
 
 
 def get_adamw_cls() -> type[torch.optim.Optimizer]:
