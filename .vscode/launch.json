@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
-      "args": ["-k", "test_gradient_clipping", "-s", "-v"],
+      "args": ["-k", "test_checkpointing", "-s", "-v"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {},
