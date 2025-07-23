@@ -54,7 +54,9 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
         self.output_proj = linear.Linear(d_model, d_model, device=device, dtype=dtype)
 
         if theta > 0 and max_seq_len > 0:
-            self.rope = rope_lib.RotaryPositionalEmbedding(theta, self.d_k, max_seq_len)
+            self.rope = rope_lib.RotaryPositionalEmbedding(
+                theta, self.d_k, max_seq_len, device=device
+            )
         else:
             if theta > 0 or max_seq_len > 0:
                 raise Exception(
@@ -71,6 +73,8 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
         k = self.k_proj(x)
         v = self.v_proj(x)
 
+        # unflatten: split d_model across the heads
+        # transpose: move the head dim into a batch position
         q_heads = q.unflatten(-1, (self.n_heads, self.d_k)).transpose(-3, -2)
         k_heads = k.unflatten(-1, (self.n_heads, self.d_k)).transpose(-3, -2)
         v_heads = v.unflatten(-1, (self.n_heads, self.d_v)).transpose(-3, -2)
@@ -78,8 +82,10 @@ class CausalMultiheadSelfAttention(torch.nn.Module):
         if token_positions is not None:
             if not self.rope:
                 raise Exception("rope must have been initialized for token_positions")
-            q_heads = self.rope(q_heads, token_positions)
-            k_heads = self.rope(k_heads, token_positions)
+            # Insert a singleton dimension where the head dim is so that RoPE ops are compatible.
+            head_token_positions = token_positions.unsqueeze(-2)
+            q_heads = self.rope(q_heads, head_token_positions)
+            k_heads = self.rope(k_heads, head_token_positions)
 
         seq_len = x.shape[-2]
         mask = torch.tril(

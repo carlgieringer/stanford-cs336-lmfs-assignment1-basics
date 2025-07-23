@@ -7,6 +7,8 @@ Tests:
 from typing import Optional
 
 import torch
+from torch import Tensor
+from jaxtyping import Int
 
 from cs336_basics import attention, embedding, linear, rmsnorm, swiglu
 from cs336_basics.softmax import softmax
@@ -20,7 +22,7 @@ class TransformerBlock(torch.nn.Module):
         d_ff: int,
         max_seq_len: int,
         theta: float,
-        device: Optional[torch.device] = None,
+        device: Optional[str | torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ):
         super().__init__()
@@ -54,7 +56,7 @@ class TransformerLm(torch.nn.Module):
         vocab_size: int,
         context_length: int,
         num_layers: int,
-        device: Optional[torch.device] = None,
+        device: Optional[str | torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ):
         super().__init__()
@@ -79,7 +81,7 @@ class TransformerLm(torch.nn.Module):
         self.ln_final = rmsnorm.RmsNorm(d_model, device=device, dtype=dtype)
         self.lm_head = linear.Linear(d_model, vocab_size, device=device, dtype=dtype)
 
-    def forward(self, x):
+    def forward(self, x: Int[Tensor, "batch context_length"]):
         out = self.token_embeddings(x)
         for layer in self.layers:
             out = layer(out)

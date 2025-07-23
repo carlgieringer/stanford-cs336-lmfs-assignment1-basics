@@ -3,9 +3,9 @@ Test:
     uv run pytest -k test_rope
 """
 
-import math
-
+from jaxtyping import Float, Int
 import torch
+from torch import Tensor
 
 
 class RotaryPositionalEmbedding(torch.nn.Module):
@@ -31,7 +31,11 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         self.register_buffer("cos_cached", cos_vals, persistent=False)
         self.register_buffer("sin_cached", sin_vals, persistent=False)
 
-    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: Float[Tensor, "... seq_len d_k"],
+        token_positions: Int[Tensor, "... seq_len"],
+    ) -> torch.Tensor:
         """Process an input tensor of shape (..., seq_len, d_k) and return a tensor of the same shape. Note
         that you should tolerate x with an arbitrary number of batch dimensions. You should assume
         that the token positions are a tensor of shape (..., seq_len) specifying the token positions of

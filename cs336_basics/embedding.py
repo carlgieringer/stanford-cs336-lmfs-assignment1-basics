@@ -1,6 +1,6 @@
 import torch
-
-from cs336_basics import linear
+from torch import Tensor
+from jaxtyping import Int, Float
 
 
 class Embedding(torch.nn.Module):
@@ -18,7 +18,9 @@ class Embedding(torch.nn.Module):
             torch.empty(num_embeddings, embedding_dim, device=device, dtype=dtype)
         )
 
-    def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, token_ids: Int[Tensor, "batch context_length"]
+    ) -> Float[Tensor, "batch d_model"]:
         """Lookup the embedding vectors for the given token IDs."""
         one_hot = torch.nn.functional.one_hot(
             token_ids, num_classes=self.weight.shape[0]

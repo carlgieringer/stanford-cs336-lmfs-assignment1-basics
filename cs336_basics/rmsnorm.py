@@ -1,8 +1,15 @@
+from typing import Optional
 import torch
 
 
 class RmsNorm(torch.nn.Module):
-    def __init__(self, d_model: int, eps: float = 1e-5, device=None, dtype=None):
+    def __init__(
+        self,
+        d_model: int,
+        eps: float = 1e-5,
+        device: Optional[str | torch.device] = None,
+        dtype: Optional[torch.dtype] = None,
+    ):
         """Construct the RMSNorm module. This function should accept the following parameters:
         d_model: int Hidden dimension of the model
         eps: float = 1e-5 Epsilon value for numerical stability

@@ -11,6 +11,17 @@
       "cwd": "${workspaceFolder}",
       "env": {},
       "python": "${workspaceFolder}/.venv/bin/python"
+    },
+    {
+      "name": "Debug Training Script",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/cs336_basics/training.py",
+      "args": ["--data-path=data/tokens-owt_train.npy"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "python": "${workspaceFolder}/.venv/bin/python"
     }
   ]
 }

@@ -9,7 +9,6 @@ uv run pytest tests/test_tokenizer.py
 from collections.abc import Iterator
 from dataclasses import dataclass
 from itertools import zip_longest
-import logging
 import pickle
 from typing import Generator, Iterable, Optional
 
@@ -17,9 +16,6 @@ import regex
 from tqdm import tqdm
 
 from cs336_basics import bpe
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 
 @dataclass
