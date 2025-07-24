@@ -4,7 +4,7 @@ Test:
 """
 
 import os
-import typing
+from typing import IO, BinaryIO, Optional
 
 import torch
 
@@ -15,7 +15,7 @@ def save_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     iteration: int,
-    out: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+    out: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     """Should also save random seeds. Is iteration enough to resume the training data?"""
     checkpoint_data = dict(
@@ -27,7 +27,7 @@ def save_checkpoint(
 
 
 def load_checkpoint(
-    src: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+    src: str | os.PathLike | BinaryIO | IO[bytes],
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
 ) -> int:
@@ -40,9 +40,9 @@ def load_checkpoint(
 def save_train_state(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
-    iteration: int,
+    iteration: Optional[int],
     params: dict,
-    out: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+    out: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     train_state = dict(
         model_state_dict=model.state_dict(),
@@ -55,7 +55,7 @@ def save_train_state(
 
 def load_train_state(
     vocab_size: int,
-    src: str | os.PathLike | typing.BinaryIO | typing.IO[bytes],
+    src: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     train_state = torch.load(src, weights_only=False)
     params = train_state["params"]

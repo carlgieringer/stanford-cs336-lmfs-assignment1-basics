@@ -28,10 +28,10 @@ class TrainingParams:
     run_name: str
     data_path: str
     batch_size: int
-    batches_per_epoch: int
-    epochs: int
+    total_steps: int
     checkpoint_interval: int
     checkpoint_path: str
+    save_intermediate_checkpoints: bool
 
 
 @dataclass

@@ -24,16 +24,16 @@ from cs336_basics.transformer import TransformerLm
 
 
 class Colors:
-    GREEN = '\033[92m'
-    BLUE = '\033[94m'
-    YELLOW = '\033[93m'
-    CYAN = '\033[96m'
-    RED = '\033[91m'
-    RESET = '\033[0m'
-    BOLD = '\033[1m'
+    GREEN = "\033[92m"
+    BLUE = "\033[94m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    RED = "\033[91m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
 
 
-def print_colored(text: str, color: str, end: str = '\n'):
+def print_colored(text: str, color: str, end: str = "\n"):
     """Print text with color."""
     print(f"{color}{text}{Colors.RESET}", end=end)
 
@@ -104,7 +104,9 @@ def generate_text(
 
     # Convert to tensor and move to model's device
     device = next(model.parameters()).device
-    tokens = torch.tensor(input_tokens, dtype=torch.long, device=device).unsqueeze(0)  # Add batch dimension
+    tokens = torch.tensor(input_tokens, dtype=torch.long, device=device).unsqueeze(
+        0
+    )  # Add batch dimension
 
     generated_text = ""
     num_generated = 0
@@ -136,11 +138,13 @@ def generate_text(
 
             # Decode and print the token
             token_text = tokenizer.decode([next_token_id])
-            print(token_text, end='', flush=True)
+            print(token_text, end="", flush=True)
             generated_text += token_text
 
             # Add token to sequence
-            next_token_tensor = torch.tensor([[next_token_id]], dtype=torch.long, device=device)
+            next_token_tensor = torch.tensor(
+                [[next_token_id]], dtype=torch.long, device=device
+            )
             tokens = torch.cat([tokens, next_token_tensor], dim=1)
 
             num_generated += 1
@@ -150,11 +154,27 @@ def generate_text(
 
 def main():
     parser = argparse.ArgumentParser(description="Interactive text generation CLI")
-    parser.add_argument("--model-checkpoint", required=True, help="Path to model checkpoint file")
-    parser.add_argument("--tokenizer", required=True, help="Path to BPE tokenizer pickle file")
-    parser.add_argument("--max-tokens", type=int, help="Maximum number of tokens to generate")
-    parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature (default: 1.0)")
-    parser.add_argument("--top-p", type=float, default=1.0, help="Top-p (nucleus) sampling parameter (default: 1.0)")
+    parser.add_argument(
+        "--model-checkpoint", required=True, help="Path to model checkpoint file"
+    )
+    parser.add_argument(
+        "--tokenizer", required=True, help="Path to BPE tokenizer pickle file"
+    )
+    parser.add_argument(
+        "--max-tokens", type=int, help="Maximum number of tokens to generate"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=1.0,
+        help="Sampling temperature (default: 1.0)",
+    )
+    parser.add_argument(
+        "--top-p",
+        type=float,
+        default=1.0,
+        help="Top-p (nucleus) sampling parameter (default: 1.0)",
+    )
 
     args = parser.parse_args()
 
@@ -174,7 +194,9 @@ def main():
     try:
         # Load tokenizer
         print_colored("Loading tokenizer...", Colors.YELLOW)
-        tokenizer = BpeTokenizer.from_file(args.tokenizer, special_tokens=["<|endoftext|>"])
+        tokenizer = BpeTokenizer.from_file(
+            args.tokenizer, special_tokens=["<|endoftext|>"]
+        )
         vocab_size = len(tokenizer.vocab)
 
         # Get the end of text token ID
@@ -191,11 +213,16 @@ def main():
 
         # Get model parameters
         context_length = 512  # Default fallback
-        if "training_params" in train_state and isinstance(train_state["training_params"], dict):
+        if "training_params" in train_state and isinstance(
+            train_state["training_params"], dict
+        ):
             training_params = train_state["training_params"]
-            if "model_params" in training_params and training_params["model_params"] is not None:
+            if (
+                "model_params" in training_params
+                and training_params["model_params"] is not None
+            ):
                 model_params = training_params["model_params"]
-                if hasattr(model_params, 'context_length'):
+                if hasattr(model_params, "context_length"):
                     context_length = int(model_params.context_length)
 
         # If we still don't have context_length from training params, keep the default
@@ -213,7 +240,9 @@ def main():
         print_colored("", Colors.RESET)  # Empty line
 
         # Interactive loop
-        print_colored("Enter text to generate completions. Press Ctrl+C to exit.", Colors.YELLOW)
+        print_colored(
+            "Enter text to generate completions. Press Ctrl+C to exit.", Colors.YELLOW
+        )
         print_colored("", Colors.RESET)  # Empty line
 
         while True:
@@ -240,7 +269,10 @@ def main():
 
                 # Print generation stats
                 print()  # New line after generation
-                print_colored(f"Generated {num_tokens} tokens (stopped: {stop_reason})", Colors.CYAN)
+                print_colored(
+                    f"Generated {num_tokens} tokens (stopped: {stop_reason})",
+                    Colors.CYAN,
+                )
                 print_colored("", Colors.RESET)  # Empty line
 
             except KeyboardInterrupt:
