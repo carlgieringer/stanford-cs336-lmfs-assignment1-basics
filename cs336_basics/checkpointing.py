@@ -8,6 +8,7 @@ from typing import IO, BinaryIO, Optional
 
 import torch
 
+from cs336_basics.train_params import TrainingRunParams
 from cs336_basics.training_objects import make_training_objects
 
 
@@ -41,14 +42,14 @@ def save_train_state(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
     iteration: Optional[int],
-    params: dict,
+    training_run_params: TrainingRunParams,
     out: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     train_state = dict(
         model_state_dict=model.state_dict(),
         optimizer_state_dict=optimizer.state_dict(),
         iteration=iteration,
-        params=params,
+        training_run_params=training_run_params,
     )
     torch.save(train_state, out)
 
@@ -58,11 +59,11 @@ def load_train_state(
     src: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     train_state = torch.load(src, weights_only=False)
-    params = train_state["params"]
-    model_params = params["model_params"]
-    optimizer_params = params["optimizer_params"]
-    training_params = params["training_params"]
-    random_seeds = params["random_seeds"]
+    training_run_params = train_state["training_run_params"]
+    model_params = training_run_params.model_params
+    optimizer_params = training_run_params.optimizer_params
+    training_params = training_run_params.training_params
+    random_seeds = training_run_params.random_seeds
 
     # if torch.accelerator.is_available():
     #     model_params.device = torch.accelerator.current_accelerator()

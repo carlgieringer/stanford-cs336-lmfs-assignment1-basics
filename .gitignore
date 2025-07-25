@@ -172,3 +172,5 @@ profile.json
 
 # macOS
 .DS_Store
+
+/wandb/
