@@ -98,12 +98,12 @@ arg_parser.add_argument("--device")
 arg_parser.add_argument("--dtype", default="float32")
 
 # Optimizer params
-arg_parser.add_argument("--learning-rate", type=float, default=1e-4)
+arg_parser.add_argument("--learning-rate", type=float, default=4e-4)
 arg_parser.add_argument("--learning-rate-schedule-max-iterations", type=int)
 arg_parser.add_argument(
     "--betas", type=lambda v: tuple(map(float, v.split(","))), default=(0.9, 0.95)
 )
-arg_parser.add_argument("--weight-decay", type=float, default=1e-4)
+arg_parser.add_argument("--weight-decay", type=float, default=1e-5)
 arg_parser.add_argument("--gradient-clip-norm", type=float, default=1.0)
 
 # Training params
@@ -151,7 +151,7 @@ class EarlyStoppingInfo:
 
 def make_wandb_config(training_run_params: TrainingRunParams):
     model_params = training_run_params.model_params
-    optimizer_params = training_run_params.optimimizer_params
+    optimizer_params = training_run_params.optimizer_params
     training_params = training_run_params.training_params
     random_seeds = training_run_params.random_seeds
     validation_params = training_run_params.validation_params
@@ -195,7 +195,7 @@ def init_seeds(random_seeds: RandomSeeds):
 
 def train_model(training_run_params: TrainingRunParams):
     model_params = training_run_params.model_params
-    optimizer_params = training_run_params.optimimizer_params
+    optimizer_params = training_run_params.optimizer_params
     training_params = training_run_params.training_params
     random_seeds = training_run_params.random_seeds
     wandb_params = training_run_params.wandb_params
@@ -317,7 +317,7 @@ def log_and_validate(
     early_stopping_info: EarlyStoppingInfo,
 ):
     model_params = training_run_params.model_params
-    optimizer_params = training_run_params.optimimizer_params
+    optimizer_params = training_run_params.optimizer_params
     training_params = training_run_params.training_params
     validation_params = training_run_params.validation_params
 
@@ -462,14 +462,14 @@ def create_wandb_sweep_config(args: argparse.Namespace):
         "method": "bayes",  # or 'grid', 'random'
         "metric": {"name": metric_name, "goal": "minimize"},
         "parameters": {
-            "learning_rate": {
-                "distribution": "log_uniform_values",
-                "min": 1e-5,
-                "max": 1e-1,
-            },
+            # "learning_rate": {
+            #     "distribution": "log_uniform_values",
+            #     "min": 1e-5,
+            #     "max": 1e-1,
+            # },
             # Add more hyperparameters to sweep over
-            "weight_decay": {"values": [1e-5, 1e-4, 1e-3]},
-            "batch_size": {"values": [32, 64]},
+            # "weight_decay": {"values": [1e-5, 1e-4, 1e-3]},
+            "batch_size": {"values": [1, 2, 4, 8, 16]},
         },
         # Early termination configuration
         "early_terminate": {
@@ -497,9 +497,9 @@ def run_wandb_sweep(args: argparse.Namespace):
 
         # Update specific fields from sweep config
         if hasattr(config, "learning_rate"):
-            training_run_params.optimimizer_params.learning_rate = config.learning_rate
+            training_run_params.optimizer_params.learning_rate = config.learning_rate
         if hasattr(config, "weight_decay"):
-            training_run_params.optimimizer_params.weight_decay = config.weight_decay
+            training_run_params.optimizer_params.weight_decay = config.weight_decay
         if hasattr(config, "batch_size"):
             training_run_params.training_params.batch_size = config.batch_size
 

@@ -67,7 +67,7 @@ class ValidationParams:
 @dataclass
 class TrainingRunParams:
     model_params: ModelParams
-    optimimizer_params: OptimizerParams
+    optimizer_params: OptimizerParams
     training_params: TrainingParams
     random_seeds: RandomSeeds
     wandb_params: WandbParams

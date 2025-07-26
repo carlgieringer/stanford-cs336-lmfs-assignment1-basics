@@ -59,11 +59,22 @@ def load_train_state(
     src: str | os.PathLike | BinaryIO | IO[bytes],
 ):
     train_state = torch.load(src, weights_only=False)
-    training_run_params = train_state["training_run_params"]
-    model_params = training_run_params.model_params
-    optimizer_params = training_run_params.optimizer_params
-    training_params = training_run_params.training_params
-    random_seeds = training_run_params.random_seeds
+    if "training_run_params" in train_state:
+        training_run_params = train_state["training_run_params"]
+        model_params = training_run_params.model_params
+        # I accidentally serialized some checkpoints using this misspelling
+        if hasattr(training_run_params, "optimimizer_params"):
+            optimizer_params = getattr(training_run_params, "optimimizer_params")
+        else:
+            optimizer_params = training_run_params.optimizer_params
+        training_params = training_run_params.training_params
+        random_seeds = training_run_params.random_seeds
+    else:
+        # Older checkpoints stored params directly on a 'params' dict.
+        model_params = train_state["params"]["model_params"]
+        optimizer_params = train_state["params"]["optimizer_params"]
+        training_params = train_state["params"]["training_params"]
+        random_seeds = train_state["params"]["random_seeds"]
 
     # if torch.accelerator.is_available():
     #     model_params.device = torch.accelerator.current_accelerator()
