@@ -381,17 +381,32 @@ def log_and_validate(
 
 
 def make_params(args: argparse.Namespace) -> TrainingRunParams:
-    compile_backend = "inductor"
     if args.device:
         device = args.device
     elif torch.accelerator.is_available():
         device = torch.accelerator.current_accelerator()
     else:
         device = "cpu"
-    if device == "mps" or isinstance(device, torch.device) and device.type == "mps":
-        compile_backend = "aot_eager"
-    if not args.compile_model:
+
+    is_mps = (
+        device == "mps" or isinstance(device, torch.device) and device.type == "mps"
+    )
+    if args.compile_model:
+        # if args.gradient_log_frequency and is_mps:
+        #     raise Exception("Wandb gradient logging does not work with compiled MPS")
+        if args.gradient_log_frequency:
+            torch._dynamo.config.capture_scalar_outputs = True  # type: ignore
+        if is_mps:
+            # inductor is not supported on MPS
+            # (Also I haven't seen a speedup from compiling on MPS)
+            compile_backend = "aot_eager"
+        else:
+            compile_backend = "inductor"
+    else:
         compile_backend = None
+
+    if not is_mps:
+        torch.set_float32_matmul_precision("high")
 
     dtype = getattr(torch, args.dtype)
     if not isinstance(dtype, torch.dtype):
