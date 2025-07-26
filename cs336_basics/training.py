@@ -128,7 +128,11 @@ arg_parser.add_argument("--wandb-entity")
 arg_parser.add_argument("--wandb-tags", type=lambda v: v.split(",") if v else [])
 arg_parser.add_argument("--wandb-notes")
 arg_parser.add_argument("--sweep-count", type=int, default=20)
-arg_parser.add_argument("--gradient-log-frequency", type=int, default=10)
+arg_parser.add_argument(
+    "--gradient-log-interval",
+    type=int,
+    help="The interval in steps to log gradients. If missing, no gradient logging.",
+)
 arg_parser.add_argument(
     "--log-artifacts",
     action="store_true",
@@ -226,8 +230,8 @@ def train_model(training_run_params: TrainingRunParams):
     if validation_params.validation_data_path:
         validation_data = np.load(validation_params.validation_data_path, mmap_mode="r")
 
-    if wandb_params.gradient_log_frequency:
-        wandb.watch(model, log="all", log_freq=wandb_params.gradient_log_frequency)
+    if wandb_params.gradient_log_interval is not None:
+        wandb.watch(model, log="all", log_freq=wandb_params.gradient_log_interval)
 
     early_stopping_info = EarlyStoppingInfo()
 
@@ -392,9 +396,9 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
         device == "mps" or isinstance(device, torch.device) and device.type == "mps"
     )
     if args.compile_model:
-        # if args.gradient_log_frequency and is_mps:
+        # if args.gradient_log_interval and is_mps:
         #     raise Exception("Wandb gradient logging does not work with compiled MPS")
-        if args.gradient_log_frequency:
+        if args.gradient_log_interval:
             torch._dynamo.config.capture_scalar_outputs = True  # type: ignore
         if is_mps:
             # inductor is not supported on MPS
@@ -456,7 +460,7 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
             entity=args.wandb_entity,
             tags=args.wandb_tags or [],
             notes=args.wandb_notes,
-            gradient_log_frequency=args.gradient_log_frequency,
+            gradient_log_interval=args.gradient_log_interval,
             log_artifacts=args.log_artifacts,
         ),
         ValidationParams(

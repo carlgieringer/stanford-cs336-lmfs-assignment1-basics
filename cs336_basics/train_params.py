@@ -50,7 +50,7 @@ class WandbParams:
     entity: Optional[str] = None
     tags: Optional[list[str]] = None
     notes: Optional[str] = None
-    gradient_log_frequency: int = 10
+    gradient_log_interval: Optional[int] = None
     log_artifacts: bool = False
 
 
