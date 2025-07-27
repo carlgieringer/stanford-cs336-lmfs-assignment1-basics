@@ -13,6 +13,7 @@ class ModelParams:
     num_layers: int
     device: str | torch.device
     dtype: torch.dtype
+    no_norms: bool
 
 
 @dataclass

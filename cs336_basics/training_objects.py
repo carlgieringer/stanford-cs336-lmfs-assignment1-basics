@@ -3,6 +3,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from cs336_basics.adamw import Adamw
 from cs336_basics.train_params import ModelParams, OptimizerParams
 from cs336_basics.transformer import TransformerLm
+from cs336_basics.transformer_no_norm import TransformerLmNoNorm
 
 
 def make_training_objects(
@@ -11,17 +12,30 @@ def make_training_objects(
     optimizer_params: OptimizerParams,
 ):
 
-    model = TransformerLm(
-        model_params.d_model,
-        model_params.num_heads,
-        model_params.d_ff,
-        model_params.rope_theta,
-        vocab_size,
-        model_params.context_length,
-        model_params.num_layers,
-        model_params.device,
-        model_params.dtype,
-    )
+    if model_params.no_norms:
+        model = TransformerLmNoNorm(
+            model_params.d_model,
+            model_params.num_heads,
+            model_params.d_ff,
+            model_params.rope_theta,
+            vocab_size,
+            model_params.context_length,
+            model_params.num_layers,
+            model_params.device,
+            model_params.dtype,
+        )
+    else:
+        model = TransformerLm(
+            model_params.d_model,
+            model_params.num_heads,
+            model_params.d_ff,
+            model_params.rope_theta,
+            vocab_size,
+            model_params.context_length,
+            model_params.num_layers,
+            model_params.device,
+            model_params.dtype,
+        )
     # model.compile()
     optimizer = Adamw(
         model.parameters(),

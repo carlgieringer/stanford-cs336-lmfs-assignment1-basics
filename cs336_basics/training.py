@@ -98,6 +98,9 @@ arg_parser.add_argument("--num-layers", type=int, default=4)
 arg_parser.add_argument("--device")
 arg_parser.add_argument("--dtype", default="float32")
 
+# Experiment params
+arg_parser.add_argument("--no-norms", action="store_true", help="Remove RMSNorm.")
+
 # Optimizer params
 arg_parser.add_argument("--learning-rate", type=float, default=4e-4)
 arg_parser.add_argument("--learning-rate-schedule-max-iterations", type=int)
@@ -438,6 +441,7 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
             args.num_layers,
             device,
             dtype,
+            args.no_norms,
         ),
         OptimizerParams(
             args.learning_rate,
