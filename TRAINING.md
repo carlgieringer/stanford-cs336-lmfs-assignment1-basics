@@ -2,11 +2,15 @@
 
 ## runpod.io
 
+Connecting:
+
 ```sh
-runpod_host=141.193.30.39
-runpod_port=41687
+runpod_host=213.173.105.5
+runpod_port=30058
 ssh root@$runpod_host -p $runpod_port -i ~/.ssh/id_ed25519
 ```
+
+Initialize the instance:
 
 ```sh
 cd /workspace/
@@ -15,7 +19,10 @@ mkdir -p stanford-cs336-lmfs-assignment1-basics/data/checkpoints
 # install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
+uv run wandb login
 ```
+
+Copy the training data:
 
 ```sh
 scp -i ~/.ssh/id_ed25519 -P $runpod_port\
@@ -26,15 +33,17 @@ scp -i ~/.ssh/id_ed25519 -P $runpod_port\
  root@${runpod_host}:/workspace/stanford-cs336-lmfs-assignment1-basics/data/tokens-TinyStoriesV2-GPT4-train.npy
 ```
 
+Kick off training:
+
 ```sh
 cd /workspace/stanford-cs336-lmfs-assignment1-basics
-run_name=TinyStories-single-with-validation-a100
+run_name=TinyStories-single-with-validation-a100-no-compile
 uv run python cs336_basics/training.py\
  --action=RunSingleTraining\
  --data-path=data/tokens-TinyStoriesV2-GPT4-train.npy\
  --validation-data-path=data/tokens-TinyStoriesV2-GPT4-valid.npy\
  --run-name=$run_name\
- --compile-model\
+ --gradient-log-interval=100\
  --total-steps=10_000\
  --validation-interval=50\
  --early-stopping-patience=5\
@@ -48,11 +57,17 @@ Copy the final snapshot locally to save it.
 ```sh
 final_snapshot_filename=${run_name}-final.pt
 scp -i ~/.ssh/id_ed25519 -P $runpod_port\
- root@${runpod_host}:/workspace/stanford-cs336-lmfs-assignment1-basics/data/checkpoints/${final_snapshot_filename}$\
+ root@${runpod_host}:/workspace/stanford-cs336-lmfs-assignment1-basics/data/checkpoints/${final_snapshot_filename}\
  data/checkpoints/${final_snapshot_filename}
 ```
 
 TODO:
 
+- Try with uncompiled and gradient logging: works
 - tmux
-- Update sweep training to keep best final snapshot and latest snapshot for current sweep.
+- Update sweep training to keep:
+  - latest snapshot for current sweep
+  - snapshot with best validation loss
+  - final snapshot
+- Update training data loader not to be random and instead to cover entire training dataset
+  (optional max length)

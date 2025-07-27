@@ -18,6 +18,7 @@ uv run python cs336_basics/training.py\
  --validation-data-path=data/tokens-TinyStoriesV2-GPT4-valid.npy\
  --run-name=TinyStories-single-with-validation\
  --total-steps=1000\
+ --compile-model\
  --validation-interval=50\
  --early-stopping-patience=5\
  --early-stopping-min-delta=0.001\
@@ -121,6 +122,7 @@ arg_parser.add_argument("--compile-model", action="store_true")
 arg_parser.add_argument("--python-random-seed", type=int, default=42)
 arg_parser.add_argument("--numpy-random-seed", type=int, default=42)
 arg_parser.add_argument("--pytorch-random-seed", type=int, default=42)
+arg_parser.add_argument("--cuda-random-seed", type=int, default=42)
 
 # Wandb
 arg_parser.add_argument("--wandb-project", default="stanford-cs336-language-model")
@@ -181,6 +183,7 @@ def make_wandb_config(training_run_params: TrainingRunParams):
         "python_random_seed": random_seeds.python,
         "numpy_random_seed": random_seeds.numpy,
         "pytorch_random_seed": random_seeds.pytorch,
+        "cuda_random_seed": random_seeds.cuda,
         # Validation params
         "validation_data_path": validation_params.validation_data_path,
         "validation_interval": validation_params.validation_interval,
@@ -195,6 +198,8 @@ def init_seeds(random_seeds: RandomSeeds):
     random.seed(random_seeds.python)
     np.random.seed(random_seeds.numpy)
     torch.manual_seed(random_seeds.pytorch)
+    torch.backends.cudnn.deterministic = True
+    torch.cuda.manual_seed_all(random_seeds.cuda)
 
 
 def train_model(training_run_params: TrainingRunParams):
@@ -454,6 +459,7 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
             args.python_random_seed,
             args.numpy_random_seed,
             args.pytorch_random_seed,
+            args.cuda_random_seed,
         ),
         WandbParams(
             project=args.wandb_project,

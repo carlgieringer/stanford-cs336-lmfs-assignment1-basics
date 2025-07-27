@@ -40,6 +40,7 @@ class RandomSeeds:
     python: int
     numpy: int
     pytorch: int
+    cuda: int
 
 
 @dataclass
