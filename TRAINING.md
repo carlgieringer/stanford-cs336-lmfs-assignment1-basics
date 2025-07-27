@@ -6,7 +6,7 @@ Connecting:
 
 ```sh
 runpod_host=213.173.105.5
-runpod_port=30058
+runpod_port=30040
 ssh root@$runpod_host -p $runpod_port -i ~/.ssh/id_ed25519
 ```
 

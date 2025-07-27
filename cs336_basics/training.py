@@ -120,6 +120,7 @@ arg_parser.add_argument(
 )
 arg_parser.add_argument("--checkpoint-dir", default="data/checkpoints")
 arg_parser.add_argument("--compile-model", action="store_true")
+arg_parser.add_argument("--torch-dynamo-capture-scalar-outputs", action="store_true")
 
 # Random seeds
 arg_parser.add_argument("--python-random-seed", type=int, default=42)
@@ -400,14 +401,15 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
     else:
         device = "cpu"
 
+    if args.torch_dynamo_capture_scalar_outputs:
+        torch._dynamo.config.capture_scalar_outputs = True  # type: ignore
+
     is_mps = (
         device == "mps" or isinstance(device, torch.device) and device.type == "mps"
     )
     if args.compile_model:
-        # if args.gradient_log_interval and is_mps:
-        #     raise Exception("Wandb gradient logging does not work with compiled MPS")
-        if args.gradient_log_interval:
-            torch._dynamo.config.capture_scalar_outputs = True  # type: ignore
+        # if args.gradient_log_interval:
+        #     raise Exception("Wandb gradient logging does not work with compiled models. See https://github.com/wandb/wandb/issues/10221")
         if is_mps:
             # inductor is not supported on MPS
             # (Also I haven't seen a speedup from compiling on MPS)
