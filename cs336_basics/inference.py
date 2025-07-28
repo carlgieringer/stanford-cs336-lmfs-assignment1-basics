@@ -205,32 +205,26 @@ def main():
         # Load model
         print_colored("Loading model...", Colors.YELLOW)
         train_state = load_train_state(vocab_size, args.model_checkpoint)
-        model = train_state["model"]
+        model = train_state.model
 
         # Ensure we have a TransformerLm model
         if not isinstance(model, TransformerLm):
             raise ValueError(f"Expected TransformerLm model, got {type(model)}")
 
         # Get model parameters
-        context_length = 512  # Default fallback
-        if "training_params" in train_state and isinstance(
-            train_state["training_params"], dict
-        ):
-            training_params = train_state["training_params"]
-            if (
-                "model_params" in training_params
-                and training_params["model_params"] is not None
-            ):
-                model_params = training_params["model_params"]
-                if hasattr(model_params, "context_length"):
-                    context_length = int(model_params.context_length)
+        context_length = train_state.training_run_params.model_params.context_length
 
         # If we still don't have context_length from training params, keep the default
         # The context_length should be saved in the training_params, so this fallback
         # is mainly for older checkpoints that might not have this information
 
+        parameter_counts = count_parameters(model)
         # Print model info
         print_colored(f"Model loaded successfully!", Colors.GREEN)
+        print_colored(
+            f"Model size: {parameter_counts['total']:,} parameters ({parameter_counts['trainable']:,} trainable)",
+            Colors.CYAN,
+        )
         print_colored(f"Vocabulary size: {vocab_size}", Colors.CYAN)
         print_colored(f"Context length: {context_length}", Colors.CYAN)
         print_colored(f"Temperature: {args.temperature}", Colors.CYAN)
@@ -292,6 +286,13 @@ def main():
         print_colored("Stack trace:", Colors.RED)
         traceback.print_exc()
         sys.exit(1)
+
+
+def count_parameters(model: torch.nn.Module):
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    non_trainable = sum(p.numel() for p in model.parameters() if not p.requires_grad)
+    total = trainable + non_trainable
+    return {"trainable": trainable, "non_trainable": non_trainable, "total": total}
 
 
 if __name__ == "__main__":

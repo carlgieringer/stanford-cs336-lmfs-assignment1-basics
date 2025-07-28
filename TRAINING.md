@@ -5,8 +5,8 @@
 Connecting:
 
 ```sh
-runpod_host=213.173.105.5
-runpod_port=30040
+runpod_host=38.128.232.9
+runpod_port=23397
 ssh root@$runpod_host -p $runpod_port -i ~/.ssh/id_ed25519
 ```
 
@@ -19,6 +19,7 @@ mkdir -p stanford-cs336-lmfs-assignment1-basics/data/checkpoints
 # install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
+cd stanford-cs336-lmfs-assignment1-basics
 uv run wandb login
 ```
 

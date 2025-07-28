@@ -3,6 +3,7 @@ Test:
     uv run pytest -k test_checkpointing
 """
 
+from dataclasses import dataclass
 import os
 from typing import IO, BinaryIO, Optional
 
@@ -67,14 +68,10 @@ def load_train_state(
             optimizer_params = getattr(training_run_params, "optimimizer_params")
         else:
             optimizer_params = training_run_params.optimizer_params
-        training_params = training_run_params.training_params
-        random_seeds = training_run_params.random_seeds
     else:
         # Older checkpoints stored params directly on a 'params' dict.
         model_params = train_state["params"]["model_params"]
         optimizer_params = train_state["params"]["optimizer_params"]
-        training_params = train_state["params"]["training_params"]
-        random_seeds = train_state["params"]["random_seeds"]
 
     # if torch.accelerator.is_available():
     #     model_params.device = torch.accelerator.current_accelerator()
@@ -88,11 +85,19 @@ def load_train_state(
     model.load_state_dict(train_state["model_state_dict"])
     optimizer.load_state_dict(train_state["optimizer_state_dict"])
 
-    return dict(
-        model=model,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        training_params=training_params,
-        random_seeds=random_seeds,
-        iteration=train_state["iteration"],
+    return TrainState(
+        model,
+        optimizer,
+        scheduler,
+        training_run_params,
+        train_state["iteration"],
     )
+
+
+@dataclass
+class TrainState:
+    model: torch.nn.Module
+    optimizer: torch.optim.Optimizer
+    scheduler: torch.optim.lr_scheduler.LRScheduler
+    training_run_params: TrainingRunParams
+    iteration: int

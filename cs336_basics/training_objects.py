@@ -1,4 +1,6 @@
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim import Optimizer
+from torch.nn import Module
+from torch.optim.lr_scheduler import CosineAnnealingLR, LRScheduler
 
 from cs336_basics.adamw import Adamw
 from cs336_basics.train_params import ModelParams, OptimizerParams
@@ -10,9 +12,9 @@ def make_training_objects(
     vocab_size: int,
     model_params: ModelParams,
     optimizer_params: OptimizerParams,
-):
-
-    if model_params.no_norms:
+) -> tuple[Module, Optimizer, LRScheduler]:
+    # Not all modls have no_norms
+    if getattr(model_params, "no_norms", False):
         model = TransformerLmNoNorm(
             model_params.d_model,
             model_params.num_heads,

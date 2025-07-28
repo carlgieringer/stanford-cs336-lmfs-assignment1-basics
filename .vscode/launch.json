@@ -22,6 +22,22 @@
       "cwd": "${workspaceFolder}",
       "env": {},
       "python": "${workspaceFolder}/.venv/bin/python"
+    },
+    {
+      "name": "Debug Inference Script",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/cs336_basics/inference.py",
+      "args": [
+        "--model-checkpoint=data/checkpoints/TinyStories-sweep-mxmkonws-final.pt",
+        "--tokenizer=data/bpe-TinyStoriesV2-GPT4-train.pk",
+        "--temperature=0.1",
+        "--top-p=0.1"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "python": "${workspaceFolder}/.venv/bin/python"
     }
   ]
 }
