@@ -13,6 +13,24 @@
       "python": "${workspaceFolder}/.venv/bin/python"
     },
     {
+      "name": "Debug Tokenizer",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/cs336_basics/run_bpe_tokenizer.py",
+      "args": [
+        "--action=TOKENIZE",
+        "--tokenizer-pickle-file=data/bpe-owt-train.pk",
+        "--corpus-path=data/owt_valid.txt",
+        "--process-count=12",
+        "--max-memory=100MiB",
+        "--output-path=data/tokens-owt-valid"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {},
+      "python": "${workspaceFolder}/.venv/bin/python"
+    },
+    {
       "name": "Debug Training Script",
       "type": "debugpy",
       "request": "launch",

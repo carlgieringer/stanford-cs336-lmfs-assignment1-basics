@@ -3,11 +3,24 @@ Run:
 
 ```sh
 uv run python cs336_basics/run_bpe_tokenizer.py\
+ --action=TOKENIZE\
  --tokenizer-pickle-file=data/bpe-TinyStoriesV2-GPT4-train.pk\
  --corpus-path=data/TinyStoriesV2-GPT4-valid.txt\
  --process-count=12\
- --max-memory=5MiB\
+ --max-memory=5GiB\
  --output-path=data/tokens-TinyStoriesV2-GPT4-valid
+```
+
+OWT:
+
+```sh
+uv run python cs336_basics/run_bpe_tokenizer.py\
+ --action=TOKENIZE\
+ --tokenizer-pickle-file=data/bpe-owt-train.pk\
+ --corpus-path=data/owt_valid.txt\
+ --process-count=12\
+ --max-memory=5GiB\
+ --output-path=data/tokens-owt-valid
 ```
 """
 
