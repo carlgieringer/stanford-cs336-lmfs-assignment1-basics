@@ -43,6 +43,39 @@ uv run python cs336_basics/training.py\
  --wandb-entity=carl-gieringer-self
 ```
 
+OWT sweep:
+
+```
+uv run python cs336_basics/training.py\
+ --action=RunWandbSweep\
+ --data-path=data/tokens-owt_train.npy\
+ --validation-data-path=data/tokens-owt_valid.npy\
+ --run-name=owt-single-run\
+ --total-steps=1000\
+ --validation-interval=50\
+ --early-stopping-patience=10\
+ --early-stopping-min-delta=0.01\
+ --wandb-project=stanford-cs336-language-model\
+ --wandb-entity=carl-gieringer-self
+```
+
+OWT run:
+
+```
+uv run python cs336_basics/training.py\
+ --action=RunSingleTraining\
+ --data-path=data/tokens-owt_train.npy\
+ --validation-data-path=data/tokens-owt_valid.npy\
+ --run-name=owt-single-run\
+ --learning-rate=0.001\
+ --total-steps=100000\
+ --validation-interval=100\
+ --early-stopping-patience=100\
+ --early-stopping-min-delta=0.01\
+ --wandb-project=stanford-cs336-language-model\
+ --wandb-entity=carl-gieringer-self
+```
+
 """
 
 import argparse
@@ -51,7 +84,7 @@ from dataclasses import dataclass
 import enum
 import logging
 import random
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 import torch
@@ -75,7 +108,7 @@ from cs336_basics.train_params import (
 )
 from cs336_basics.training_objects import make_training_objects
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -239,8 +272,11 @@ def train_model(training_run_params: TrainingRunParams):
     if validation_params.validation_data_path:
         validation_data = np.load(validation_params.validation_data_path, mmap_mode="r")
 
-    if wandb_params.gradient_log_interval is not None:
-        wandb.watch(model, log="all", log_freq=wandb_params.gradient_log_interval)
+    if (
+        training_params.gradient_log_interval is not None
+        and not training_params.compile_backend
+    ):
+        wandb.watch(model, log="all", log_freq=training_params.gradient_log_interval)
 
     early_stopping_info = EarlyStoppingInfo()
 
@@ -281,6 +317,12 @@ def train_model(training_run_params: TrainingRunParams):
             checkpoint_and_log_artifact(
                 training_run_params, model, optimizer, run, step
             )
+        if (
+            training_params.gradient_log_interval
+            and training_params.compile_backend
+            and step % training_params.gradient_log_interval == 0
+        ):
+            log_gradients(model, step)
 
     checkpoint_and_log_artifact(training_run_params, model, optimizer, run, step=None)
 
@@ -314,7 +356,7 @@ def checkpoint_and_log_artifact(
         checkpoint_path,
     )
 
-    if training_run_params.wandb_params.log_artifacts:
+    if training_run_params.training_params.log_artifacts:
         artifact = wandb.Artifact(f"model-checkpoint-{step_description}", type="model")
         artifact.add_file(checkpoint_path)
         run.log_artifact(artifact)
@@ -369,11 +411,9 @@ def log_and_validate(
         log_dict["validation_loss"] = validation_loss
 
         # Early stopping logic
-        if (
-            validation_loss
-            < early_stopping_info.best_validation_loss
-            - validation_params.early_stopping_min_delta
-        ):
+        best_validation_loss = early_stopping_info.best_validation_loss
+        early_stopping_min_delta = validation_params.early_stopping_min_delta
+        if best_validation_loss - validation_loss >= early_stopping_min_delta:
             best_validation_loss = validation_loss
             patience_counter = 0
             log_dict["best_validation_loss"] = best_validation_loss
@@ -393,6 +433,19 @@ def log_and_validate(
     )
 
 
+def log_gradients(model, step):
+    """Wandb gradient logging does not work with compiled models. See https://github.com/wandb/wandb/issues/10221"""
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            wandb.log(
+                {
+                    f"gradients/{name}.norm": param.grad.norm().item(),
+                    f"gradients/{name}.mean": param.grad.mean().item(),
+                },
+                step=step,
+            )
+
+
 def make_params(args: argparse.Namespace) -> TrainingRunParams:
     if args.device:
         device = args.device
@@ -408,8 +461,6 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
         device == "mps" or isinstance(device, torch.device) and device.type == "mps"
     )
     if args.compile_model:
-        # if args.gradient_log_interval:
-        #     raise Exception("Wandb gradient logging does not work with compiled models. See https://github.com/wandb/wandb/issues/10221")
         if is_mps:
             # inductor is not supported on MPS
             # (Also I haven't seen a speedup from compiling on MPS)
@@ -460,6 +511,8 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
             args.checkpoint_interval,
             args.checkpoint_dir,
             compile_backend,
+            gradient_log_interval=args.gradient_log_interval,
+            log_artifacts=args.log_artifacts,
         ),
         RandomSeeds(
             args.python_random_seed,
@@ -472,8 +525,6 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
             entity=args.wandb_entity,
             tags=args.wandb_tags or [],
             notes=args.wandb_notes,
-            gradient_log_interval=args.gradient_log_interval,
-            log_artifacts=args.log_artifacts,
         ),
         ValidationParams(
             validation_data_path=args.validation_data_path,
@@ -493,14 +544,14 @@ def create_wandb_sweep_config(args: argparse.Namespace):
         "method": "bayes",  # or 'grid', 'random'
         "metric": {"name": metric_name, "goal": "minimize"},
         "parameters": {
-            # "learning_rate": {
-            #     "distribution": "log_uniform_values",
-            #     "min": 1e-5,
-            #     "max": 1e-1,
-            # },
+            "learning_rate": {
+                "distribution": "log_uniform_values",
+                "min": 1e-5,
+                "max": 1e-1,
+            },
             # Add more hyperparameters to sweep over
             # "weight_decay": {"values": [1e-5, 1e-4, 1e-3]},
-            "batch_size": {"values": [1, 2, 4, 8, 16]},
+            # "batch_size": {"values": [1, 2, 4, 8, 16]},
         },
         # Early termination configuration
         "early_terminate": {

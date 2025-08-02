@@ -34,6 +34,8 @@ class TrainingParams:
     checkpoint_interval: int
     checkpoint_dir: str
     compile_backend: Optional[str]
+    gradient_log_interval: Optional[int] = None
+    log_artifacts: bool = False
 
 
 @dataclass
@@ -52,8 +54,6 @@ class WandbParams:
     entity: Optional[str] = None
     tags: Optional[list[str]] = None
     notes: Optional[str] = None
-    gradient_log_interval: Optional[int] = None
-    log_artifacts: bool = False
 
 
 @dataclass
