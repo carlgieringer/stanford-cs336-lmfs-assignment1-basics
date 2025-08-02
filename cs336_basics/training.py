@@ -119,6 +119,7 @@ class Action(enum.Enum):
 
 arg_parser = argparse.ArgumentParser()
 
+arg_parser.add_argument("--log-level")
 arg_parser.add_argument("--action", type=Action, choices=list(Action))
 
 # Model params
@@ -266,7 +267,9 @@ def train_model(training_run_params: TrainingRunParams):
         vocab_size, model_params, optimizer_params
     )
     if training_params.compile_backend:
+        logger.debug(f"Compiling model with backend {training_params.compile_backend}")
         model.compile(backend=training_params.compile_backend)
+        logger.debug(f"Done compiling model")
 
     validation_data = None
     if validation_params.validation_data_path:
@@ -281,6 +284,7 @@ def train_model(training_run_params: TrainingRunParams):
     early_stopping_info = EarlyStoppingInfo()
 
     for step in tqdm(range(training_params.total_steps), desc="Steps", unit="step"):
+        logger.debug("Loading data")
         inputs, targets = load_data(
             training_data,
             training_params.batch_size,
@@ -288,12 +292,16 @@ def train_model(training_run_params: TrainingRunParams):
             model_params.device,
         )
 
+        logger.debug("Predicting logits")
         logits = model(inputs)
+        logger.debug("Calculating loss")
         loss = batched_cross_entropy(logits, targets)
+        logger.debug("Calculating gradients")
         loss.backward()
 
         clip_gradients(model.parameters(), optimizer_params.gradient_clip_norm)
 
+        logger.debug("Stepping optimizer")
         optimizer.step()
         scheduler.step()
         optimizer.zero_grad()
@@ -622,6 +630,7 @@ def run_single_training(args: argparse.Namespace):
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
+    logger.setLevel(args.log_level)
     logger.info(f"Running {arg_parser.prog} with args: {args}")
     if args.action == Action.RunSingleTraining:
         run_single_training(args)
