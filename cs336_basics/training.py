@@ -43,7 +43,7 @@ uv run python cs336_basics/training.py\
  --wandb-entity=carl-gieringer-self
 ```
 
-OWT sweep:
+OWT local sweep:
 
 ```
 uv run python cs336_basics/training.py\
@@ -54,6 +54,22 @@ uv run python cs336_basics/training.py\
  --total-steps=1000\
  --validation-interval=50\
  --early-stopping-patience=10\
+ --early-stopping-min-delta=0.01\
+ --wandb-project=stanford-cs336-language-model\
+ --wandb-entity=carl-gieringer-self
+```
+
+OWT GPU sweep:
+
+```
+uv run python cs336_basics/training.py\
+ --action=RunWandbSweep\
+ --data-path=data/tokens-owt_train.npy\
+ --validation-data-path=data/tokens-owt_valid.npy\
+ --run-name=owt-single-run\
+ --total-steps=10000\
+ --validation-interval=50\
+ --early-stopping-patience=100\
  --early-stopping-min-delta=0.01\
  --wandb-project=stanford-cs336-language-model\
  --wandb-entity=carl-gieringer-self
@@ -92,7 +108,7 @@ from tqdm import tqdm
 import wandb
 import wandb.wandb_run
 
-from cs336_basics import git
+from cs336_basics import devices, git
 from cs336_basics.checkpointing import save_train_state
 from cs336_basics.cross_entropy import batched_cross_entropy
 from cs336_basics.data_loading import load_data
@@ -455,13 +471,7 @@ def log_gradients(model, step):
 
 
 def make_params(args: argparse.Namespace) -> TrainingRunParams:
-    if args.device:
-        device = args.device
-    elif torch.accelerator.is_available():
-        device = torch.accelerator.current_accelerator()
-    else:
-        device = "cpu"
-
+    device = devices.get_device(args.device)
     if args.torch_dynamo_capture_scalar_outputs:
         torch._dynamo.config.capture_scalar_outputs = True  # type: ignore
 
@@ -552,14 +562,13 @@ def create_wandb_sweep_config(args: argparse.Namespace):
         "method": "bayes",  # or 'grid', 'random'
         "metric": {"name": metric_name, "goal": "minimize"},
         "parameters": {
-            "learning_rate": {
-                "distribution": "log_uniform_values",
-                "min": 1e-5,
-                "max": 1e-1,
-            },
-            # Add more hyperparameters to sweep over
-            # "weight_decay": {"values": [1e-5, 1e-4, 1e-3]},
-            # "batch_size": {"values": [1, 2, 4, 8, 16]},
+            # "learning_rate": {
+            #     "distribution": "log_uniform_values",
+            #     "min": 1e-5,
+            #     "max": 1e-1,
+            # },
+            "context_length": {"values": [256, 1024, 2048]},
+            "batch_size": {"values": [128, 256, 512, 1024, 2048]},
         },
         # Early termination configuration
         "early_terminate": {

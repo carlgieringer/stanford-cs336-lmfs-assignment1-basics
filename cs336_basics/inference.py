@@ -2,12 +2,21 @@
 Interactive CLI for text generation using a trained transformer model.
 
 Usage:
-    python cs336_basics/inference.py \
-        --model-checkpoint path/to/checkpoint.pt \
-        --tokenizer path/to/tokenizer.pkl \
-        --max-tokens 100 \
-        --temperature 0.8 \
-        --top-p 0.9
+
+```
+python cs336_basics/inference.py \
+    --model-checkpoint path/to/checkpoint.pt \
+    --tokenizer path/to/tokenizer.pkl \
+    --max-tokens 100 \
+    --temperature 0.8 \
+    --top-p 0.9
+
+python cs336_basics/inference.py \
+    --model-checkpoint data/checkpoints/owt-single-run-final.pt \
+    --tokenizer data/bpe-owt-train.pk \
+    --temperature 0.8 \
+    --top-p 0.9
+```
 """
 
 import argparse
@@ -17,6 +26,7 @@ from typing import Optional
 
 import torch
 
+from cs336_basics import devices
 from cs336_basics.bpe_tokenizer import BpeTokenizer
 from cs336_basics.checkpointing import load_train_state
 from cs336_basics.softmax import softmax
@@ -155,6 +165,10 @@ def generate_text(
 def main():
     parser = argparse.ArgumentParser(description="Interactive text generation CLI")
     parser.add_argument(
+        "--device",
+        help="The device to use. Otherwise defaults to the current accelerator, if any, or CPU",
+    )
+    parser.add_argument(
         "--model-checkpoint", required=True, help="Path to model checkpoint file"
     )
     parser.add_argument(
@@ -203,8 +217,9 @@ def main():
         endoftext_token_id = tokenizer.token_by_bytes["<|endoftext|>".encode("utf-8")]
 
         # Load model
-        print_colored("Loading model...", Colors.YELLOW)
-        train_state = load_train_state(vocab_size, args.model_checkpoint)
+        device = devices.get_device(args.device)
+        print_colored(f"Loading model to device {device}...", Colors.YELLOW)
+        train_state = load_train_state(vocab_size, args.model_checkpoint, device)
         model = train_state.model
 
         # Ensure we have a TransformerLm model

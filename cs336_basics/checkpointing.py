@@ -58,8 +58,9 @@ def save_train_state(
 def load_train_state(
     vocab_size: int,
     src: str | os.PathLike | BinaryIO | IO[bytes],
+    device: Optional[str | torch.device],
 ):
-    train_state = torch.load(src, weights_only=False)
+    train_state = torch.load(src, weights_only=False, map_location=device)
     if "training_run_params" in train_state:
         training_run_params = train_state["training_run_params"]
         model_params = training_run_params.model_params
@@ -73,14 +74,12 @@ def load_train_state(
         model_params = train_state["params"]["model_params"]
         optimizer_params = train_state["params"]["optimizer_params"]
 
-    # if torch.accelerator.is_available():
-    #     model_params.device = torch.accelerator.current_accelerator()
+    if device:
+        model_params.device = device
 
     model, optimizer, scheduler = make_training_objects(
         vocab_size, model_params, optimizer_params
     )
-    # if torch.accelerator.is_available():
-    #     model.to(torch.accelerator.current_accelerator())
 
     model.load_state_dict(train_state["model_state_dict"])
     optimizer.load_state_dict(train_state["optimizer_state_dict"])
