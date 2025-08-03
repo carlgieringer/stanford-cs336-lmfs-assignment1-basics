@@ -68,8 +68,8 @@ uv run python cs336_basics/training.py\
  --validation-data-path=data/tokens-owt_valid.npy\
  --run-name=owt-single-run\
  --learning-rate=0.001\
- --total-steps=100000\
- --validation-interval=100\
+ --total-steps=1000\
+ --validation-interval=10\
  --early-stopping-patience=100\
  --early-stopping-min-delta=0.01\
  --wandb-project=stanford-cs336-language-model\
@@ -119,7 +119,7 @@ class Action(enum.Enum):
 
 arg_parser = argparse.ArgumentParser()
 
-arg_parser.add_argument("--log-level")
+arg_parser.add_argument("--log-level", default="INFO")
 arg_parser.add_argument("--action", type=Action, choices=list(Action))
 
 # Model params
@@ -631,6 +631,7 @@ def run_single_training(args: argparse.Namespace):
 if __name__ == "__main__":
     args = arg_parser.parse_args()
     logger.setLevel(args.log_level)
+
     logger.info(f"Running {arg_parser.prog} with args: {args}")
     if args.action == Action.RunSingleTraining:
         run_single_training(args)
