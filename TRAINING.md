@@ -85,15 +85,15 @@ scp\
 `ssh` back into the host.
 
 ```sh
+# Copy data locally (faster?)
+cp stanford-cs336/stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy
+cp stanford-cs336/stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy
+
 cd stanford-cs336/stanford-cs336-lmfs-assignment1-basics/
 
 # Install GPU torch (CUDA 12.8)
 uv remove torch
 uv pip install torch --index-url https://download.pytorch.org/whl/cu128
-
-# Copy data locally
-cp stanford-cs336/stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy
-cp stanford-cs336/stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy
 
 uv run python cs336_basics/training.py\
  --action=RunSingleTraining\

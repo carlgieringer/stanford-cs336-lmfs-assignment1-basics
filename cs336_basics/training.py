@@ -567,8 +567,8 @@ def create_wandb_sweep_config(args: argparse.Namespace):
             #     "min": 1e-5,
             #     "max": 1e-1,
             # },
-            "context_length": {"values": [256, 1024, 2048]},
-            "batch_size": {"values": [128, 256, 512, 1024, 2048]},
+            "context_length": {"values": [256, 2048]},
+            "batch_size": {"values": [64, 128]},
         },
         # Early termination configuration
         "early_terminate": {
