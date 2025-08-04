@@ -4,15 +4,15 @@ Interactive CLI for text generation using a trained transformer model.
 Usage:
 
 ```
-python cs336_basics/inference.py \
+uv run python cs336_basics/inference.py \
     --model-checkpoint path/to/checkpoint.pt \
     --tokenizer path/to/tokenizer.pkl \
     --max-tokens 100 \
     --temperature 0.8 \
     --top-p 0.9
 
-python cs336_basics/inference.py \
-    --model-checkpoint data/checkpoints/owt-single-run-final.pt \
+uv run python cs336_basics/inference.py \
+    --model-checkpoint data/checkpoints/owt-single-run-final-1024.pt \
     --tokenizer data/bpe-owt-train.pk \
     --temperature 0.8 \
     --top-p 0.9
@@ -235,13 +235,13 @@ def main():
 
         parameter_counts = count_parameters(model)
         # Print model info
+        print_colored(f"Vocabulary size: {vocab_size}", Colors.CYAN)
         print_colored(f"Model loaded successfully!", Colors.GREEN)
         print_colored(
             f"Model size: {parameter_counts['total']:,} parameters ({parameter_counts['trainable']:,} trainable)",
             Colors.CYAN,
         )
-        print_colored(f"Vocabulary size: {vocab_size}", Colors.CYAN)
-        print_colored(f"Context length: {context_length}", Colors.CYAN)
+        print_colored(f"Train state: {train_state}", Colors.CYAN)
         print_colored(f"Temperature: {args.temperature}", Colors.CYAN)
         print_colored(f"Top-p: {args.top_p}", Colors.CYAN)
         if args.max_tokens:

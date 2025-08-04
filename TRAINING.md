@@ -86,10 +86,10 @@ scp\
 
 ```sh
 # Copy data locally (faster?)
-cp stanford-cs336/stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy
-cp stanford-cs336/stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy
+cp stanford-cs336/data/tokens-owt_valid.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_valid.npy
+cp stanford-cs336/data/tokens-owt_train.npy stanford-cs336-lmfs-assignment1-basics/data/tokens-owt_train.npy
 
-cd stanford-cs336/stanford-cs336-lmfs-assignment1-basics/
+cd stanford-cs336-lmfs-assignment1-basics
 
 # Install GPU torch (CUDA 12.8)
 uv remove torch
@@ -108,7 +108,9 @@ uv run python cs336_basics/training.py\
  --early-stopping-patience=100\
  --early-stopping-min-delta=0.01\
  --wandb-project=stanford-cs336-language-model\
- --wandb-entity=carl-gieringer-self
+ --wandb-entity=carl-gieringer-self\
+ --context-length=1024\
+ --batch-size=64
  ```
 
 ### Post training

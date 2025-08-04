@@ -36,6 +36,7 @@ class TrainingParams:
     compile_backend: Optional[str]
     gradient_log_interval: Optional[int] = None
     log_artifacts: bool = False
+    final_checkpoint_dir: Optional[str] = None
 
 
 @dataclass

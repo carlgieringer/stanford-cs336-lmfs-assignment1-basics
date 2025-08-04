@@ -92,6 +92,24 @@ uv run python cs336_basics/training.py\
  --wandb-entity=carl-gieringer-self
 ```
 
+Lambda Cloud training with auto-termination:
+
+```
+uv run python cs336_basics/training.py\
+ --action=RunSingleTraining\
+ --data-path=data/tokens-owt_train.npy\
+ --validation-data-path=data/tokens-owt_valid.npy\
+ --run-name=owt-lambda-run\
+ --total-steps=10000\
+ --validation-interval=50\
+ --early-stopping-patience=100\
+ --early-stopping-min-delta=0.01\
+ --wandb-project=stanford-cs336-language-model\
+ --wandb-entity=carl-gieringer-self\
+ --terminate-at-end\
+ --final-checkpoint-dir=/home/ubuntu/stanford-cs336/checkpoints/
+```
+
 """
 
 import argparse
@@ -99,7 +117,9 @@ import dataclasses
 from dataclasses import dataclass
 import enum
 import logging
+import os
 import random
+import shutil
 from typing import Optional
 
 import numpy as np
@@ -113,6 +133,12 @@ from cs336_basics.checkpointing import save_train_state
 from cs336_basics.cross_entropy import batched_cross_entropy
 from cs336_basics.data_loading import load_data
 from cs336_basics.gradient_clipping import clip_gradients
+from cs336_basics.lambda_cloud import (
+    terminate_current_instance,
+    validate_and_get_instance_info,
+    get_api_key,
+    LambdaCloudError,
+)
 from cs336_basics.train_params import (
     ModelParams,
     OptimizerParams,
@@ -126,6 +152,9 @@ from cs336_basics.training_objects import make_training_objects
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Global variable to store Lambda Cloud API key for unattended termination
+_lambda_cloud_api_key: Optional[str] = None
 
 
 class Action(enum.Enum):
@@ -169,6 +198,11 @@ arg_parser.add_argument(
     "--checkpoint-interval", type=int, help="If missing, no intermediate checkpointing."
 )
 arg_parser.add_argument("--checkpoint-dir", default="data/checkpoints")
+arg_parser.add_argument(
+    "--final-checkpoint-dir",
+    help="Directory to copy the final checkpoint to at the end of training. "
+    "Useful with --terminate-at-end to preserve checkpoints.",
+)
 arg_parser.add_argument("--compile-model", action="store_true")
 arg_parser.add_argument("--torch-dynamo-capture-scalar-outputs", action="store_true")
 
@@ -200,6 +234,14 @@ arg_parser.add_argument("--validation-data-path")
 arg_parser.add_argument("--validation-interval", type=int, default=50)
 arg_parser.add_argument("--early-stopping-patience", type=int, default=5)
 arg_parser.add_argument("--early-stopping-min-delta", type=float, default=0.001)
+
+# Lambda Cloud instance termination
+arg_parser.add_argument(
+    "--terminate-at-end",
+    action="store_true",
+    help="Terminate the Lambda Cloud instance when training completes. "
+    "Requires Lambda Cloud API key and validates that the current host is a Lambda Cloud instance.",
+)
 
 
 @dataclass
@@ -254,6 +296,18 @@ def init_seeds(random_seeds: RandomSeeds):
     torch.manual_seed(random_seeds.pytorch)
     torch.backends.cudnn.deterministic = True
     torch.cuda.manual_seed_all(random_seeds.cuda)
+
+
+def copy_final_checkpoint(checkpoint_path: str, dest_dir: str):
+    """Copy the final checkpoint to the specified final checkpoint directory."""
+
+    os.makedirs(dest_dir, exist_ok=True)
+    try:
+        logger.info(f"Copying checkpoint from {checkpoint_path} to {dest_dir}")
+        shutil.copy2(checkpoint_path, dest_dir)
+        logger.info(f"Checkpoint copied from {checkpoint_path} to {dest_dir}")
+    except Exception as e:
+        logger.error(f"Failed to copy final checkpoint: {e}")
 
 
 def train_model(training_run_params: TrainingRunParams):
@@ -348,7 +402,14 @@ def train_model(training_run_params: TrainingRunParams):
         ):
             log_gradients(model, step)
 
-    checkpoint_and_log_artifact(training_run_params, model, optimizer, run, step=None)
+    final_checkpoint_path = checkpoint_and_log_artifact(
+        training_run_params, model, optimizer, run, step=None
+    )
+
+    if training_params.final_checkpoint_dir:
+        copy_final_checkpoint(
+            final_checkpoint_path, training_params.final_checkpoint_dir
+        )
 
     final_loss = loss.item()
     wandb.log(
@@ -384,6 +445,8 @@ def checkpoint_and_log_artifact(
         artifact = wandb.Artifact(f"model-checkpoint-{step_description}", type="model")
         artifact.add_file(checkpoint_path)
         run.log_artifact(artifact)
+
+    return checkpoint_path
 
 
 def log_and_validate(
@@ -531,6 +594,7 @@ def make_params(args: argparse.Namespace) -> TrainingRunParams:
             compile_backend,
             gradient_log_interval=args.gradient_log_interval,
             log_artifacts=args.log_artifacts,
+            final_checkpoint_dir=args.final_checkpoint_dir,
         ),
         RandomSeeds(
             args.python_random_seed,
@@ -580,6 +644,15 @@ def create_wandb_sweep_config(args: argparse.Namespace):
     return sweep_config
 
 
+def try_terminate_current_instance():
+    """Attempt to terminate the current Lambda Cloud instance using stored API key."""
+    try:
+        terminate_current_instance(_lambda_cloud_api_key)
+    except LambdaCloudError as e:
+        # Don't re-raise - training was successful, termination failure shouldn't fail the script
+        logger.error(f"Failed to terminate Lambda Cloud instance: {e}")
+
+
 def run_wandb_sweep(args: argparse.Namespace):
     """Run wandb sweep for hyperparameter optimization."""
 
@@ -626,24 +699,61 @@ def run_wandb_sweep(args: argparse.Namespace):
     logger.info(f"Created wandb sweep with ID: {sweep_id}")
     logger.info(f"Starting wandb agent with {args.sweep_count} runs")
 
-    # Run the sweep agent
-    wandb.agent(sweep_id, train_with_sweep, count=args.sweep_count)
-
-    logger.info("Wandb sweep completed")
+    try:
+        # Run the sweep agent
+        wandb.agent(sweep_id, train_with_sweep, count=args.sweep_count)
+        logger.info("Wandb sweep completed")
+    finally:
+        # Terminate instance if requested
+        if args.terminate_at_end:
+            try_terminate_current_instance()
 
 
 def run_single_training(args: argparse.Namespace):
     """Run a single training run with wandb logging."""
     training_run_params = make_params(args)
     logger.info(f"Running single training with params {training_run_params}")
-    train_model(training_run_params)
+
+    try:
+        train_model(training_run_params)
+        logger.info("Training completed successfully")
+    finally:
+        # Terminate instance if requested
+        if args.terminate_at_end:
+            try_terminate_current_instance()
+
+
+def process_terminate_at_end():
+    global _lambda_cloud_api_key
+
+    if not args.terminate_at_end:
+        return
+
+    logger.info("--terminate-at-end flag detected. Validating Lambda Cloud instance...")
+    try:
+        _lambda_cloud_api_key = get_api_key()
+        validate_and_get_instance_info(_lambda_cloud_api_key)
+        logger.info(
+            "Lambda Cloud instance validation successful. Proceeding with training."
+        )
+    except LambdaCloudError as e:
+        logger.error(f"Lambda Cloud validation failed: {e}")
+        logger.error(
+            "Exiting to prevent accidental usage of --terminate-at-end on non-Lambda Cloud instances."
+        )
+        exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error during Lambda Cloud validation: {e}")
+        exit(1)
 
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
     logger.setLevel(args.log_level)
-
     logger.info(f"Running {arg_parser.prog} with args: {args}")
+
+    process_terminate_at_end()
+
     if args.action == Action.RunSingleTraining:
         run_single_training(args)
     elif args.action == Action.RunWandbSweep:
