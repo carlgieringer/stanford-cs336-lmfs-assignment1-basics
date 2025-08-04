@@ -601,6 +601,8 @@ def run_wandb_sweep(args: argparse.Namespace):
             training_run_params.optimizer_params.weight_decay = config.weight_decay
         if hasattr(config, "batch_size"):
             training_run_params.training_params.batch_size = config.batch_size
+        if hasattr(config, "context_length"):
+            training_run_params.model_params.context_length = config.context_length
 
         # Update run name to include sweep info
         training_run_params.training_params.run_name = f"{args.run_name}-{run.id}"
