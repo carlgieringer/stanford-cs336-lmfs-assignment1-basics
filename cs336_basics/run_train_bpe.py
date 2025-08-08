@@ -2,10 +2,11 @@
 Run like:
 
 ```sh
-uv run python cs336_basics/run_bpe.py\
+uv run python cs336_basics/run_train_bpe.py\
  --input-path=data/TinyStoriesV2-GPT4-valid.txt\
  --vocab-size=10000\
  --special-tokens='<|endoftext|>'\
+ --num-processes=12\
  --output-path=data/bpe-TinyStoriesV2-GPT4-valid.pk
 ```
 """
